@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+proyVA.pro.user
+proyVA.pro.user.*
