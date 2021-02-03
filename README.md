@@ -13,5 +13,5 @@ sudo depmod -a
 ```
 Una vez instalado creamos el dispositivo de vídeo
 ```
-modprobe v4l2loopback video_nr=5
+sudo modprobe v4l2loopback video_nr=5
 ```
