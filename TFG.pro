@@ -16,15 +16,19 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    imgviewer.cpp \
+    fcnmask.cpp \
+    imageviewer.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    operations.cpp
 
 HEADERS += \
-    imgviewer.h \
-    mainwindow.h
+    fcnmask.h \
+    imageviewer.h \
+    mainwindow.h \
+    operations.h
 
-LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_videoio -lopencv_imgcodecs -lopencv_core -lopencv_highgui -lopencv_features2d -lopencv_flann -lopencv_video -lopencv_calib3d
+LIBS += -L/usr/local/lib -lX11 -lopencv_imgproc -lopencv_videoio -lopencv_imgcodecs -lopencv_core -lopencv_highgui -lopencv_features2d -lopencv_flann -lopencv_video -lopencv_calib3d -lopencv_dnn -lpthread -lopencv_photo
 
 FORMS += \
     mainwindow.ui
@@ -33,3 +37,5 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DISTFILES +=
