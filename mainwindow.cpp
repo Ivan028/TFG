@@ -11,6 +11,7 @@ MainWindow::MainWindow( QWidget *parent )
 
     win_selected = false;
     ui->Panel_Editor->setHidden( true );
+    ui->Escena_Renombrar->setHidden( true );
 
     // Configuramos la combobox de la resolución y seleccionamos una por defecto
     for ( int i = 0; i < ( int ) resoluciones.size(); i++ )
@@ -39,7 +40,7 @@ MainWindow::MainWindow( QWidget *parent )
     display = XOpenDisplay( NULL );
     if ( display == NULL )
     {
-        std::cerr << "ERROR: al abrir el display" << "\n";
+        cerr << "ERROR: al abrir el display" << "\n";
         return;
     }
 
@@ -74,6 +75,12 @@ MainWindow::MainWindow( QWidget *parent )
     connect( ui->Escenas_Lista, SIGNAL( currentRowChanged( int ) ), this, SLOT( escenas_lista_Select_Signal( int ) ) );
     connect( ui->Anadir_Escena_Btn, SIGNAL( clicked( bool ) ), this, SLOT( anadir_escena_Btn_Signal() ) );
     connect( ui->Borrar_Escena_Btn, SIGNAL( clicked( bool ) ), this, SLOT( borrar_escena_Btn_Signal() ) );
+    connect( ui->Renombrar_Escena_Btn, SIGNAL( clicked( bool ) ), this, SLOT( renombrar_escena_Btn_Signal() ) );
+    connect( ui->Cancelar_Renombrar_Btn, SIGNAL( clicked( bool ) ), this, SLOT( cancelar_renombrar_escena_Btn_Signal() ) );
+    connect( ui->Aceptar_Renombrar_Btn, SIGNAL( clicked( bool ) ), this, SLOT( aceptar_renombrar_escena_Btn_Signal() ) );
+    connect( ui->Renombrar_Escena_TextEdit, SIGNAL( textChanged() ), this, SLOT( renombrar_Changed_Signal() ) );
+    connect( ui->Exportar_Escena_Btn, SIGNAL( clicked( bool ) ), this, SLOT( exportar_escena_Btn_Signal() ) );
+    connect( ui->Importar_Escena_Btn, SIGNAL( clicked( bool ) ), this, SLOT( importar_escena_Btn_Signal() ) );
 
     /* --- Acciones elementos --- */
     connect( ui->Flecha_Arriba, SIGNAL( clicked( bool ) ), this, SLOT( flecha_arriba_Btn_Signal() ) );
@@ -128,6 +135,18 @@ void MainWindow::ui_to_mem()
     elto_vi->rotacion = ui->Rotacion_Slider->value();
 }
 
+vector<string> MainWindow::split_string( string texto, char delimitador )
+{
+    vector<string> elementos;
+    stringstream texto_stream( texto );
+    string str;
+    while ( getline( texto_stream, str, delimitador ) )
+    {
+        elementos.push_back( str );
+    }
+    return elementos;
+}
+
 /* ---  Gestión interfaz  --- */
 
 void MainWindow::gestion_interfaz_seccion_editar()
@@ -176,6 +195,11 @@ void MainWindow::gestion_interfaz_escena( bool update_lista_eltos, int seleccion
         ui->Elementos_Lista->clear();
         ui->Anadir_Elto_Btn->setEnabled( false );
         ui->Borrar_Escena_Btn->setEnabled( false );
+
+        ui->Escena_Renombrar->setHidden( true );
+        ui->Escena_Botones->setHidden( false );
+        ui->Renombrar_Escena_Btn->setEnabled( false );
+        ui->Exportar_Escena_Btn->setEnabled( false );
     }
     else   // Hay una escena seleccionada
     {
@@ -188,7 +212,7 @@ void MainWindow::gestion_interfaz_escena( bool update_lista_eltos, int seleccion
             ui->Elementos_Lista->clear();
 
             // Listamos los elementos
-            std::vector<elemento_visual> *lista_eltos = &lista_eltos_visuales.at( escena_index );
+            vector<elemento_visual> *lista_eltos = &lista_eltos_visuales.at( escena_index );
             for ( int i = 0; i < ( int )lista_eltos->size(); i++ )
             {
                 ui->Elementos_Lista->addItem( lista_eltos->at( i ).nombre );
@@ -204,6 +228,9 @@ void MainWindow::gestion_interfaz_escena( bool update_lista_eltos, int seleccion
 
             ui->Elementos_Lista->setCurrentRow( seleccionar );
         }
+
+        ui->Renombrar_Escena_Btn->setEnabled( true );
+        ui->Exportar_Escena_Btn->setEnabled( true );
     }
 }
 
@@ -468,7 +495,7 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
     cv::resize( mascara, mascara, Size( elto.width, elto.height ) );
 
     // Recortamos la parte del elemento que queda fuera de pantalla
-    Rect image_rect = Rect( 0, 0, std::min( elto.width, VID_WIDTH - elto.x ), std::min( elto.height, VID_HEIGHT - elto.y ) );
+    Rect image_rect = Rect( 0, 0, min( elto.width, VID_WIDTH - elto.x ), min( elto.height, VID_HEIGHT - elto.y ) );
     frame = Mat( frame, image_rect );
     mascara = Mat( mascara, image_rect );
 
@@ -860,7 +887,7 @@ void MainWindow::escenas_lista_Select_Signal( int val )
     // Detiene el VideoCapture y el threat de la antigua escena (si los hay)
     if ( ant_escena != -1 )
     {
-        std::vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( ant_escena );
+        vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( ant_escena );
         for ( int i = 0; i < ( int )escena_actual->size(); i++ )
         {
             if ( escena_actual->at( i ).is_camara )
@@ -875,12 +902,19 @@ void MainWindow::escenas_lista_Select_Signal( int val )
     }
 
     // Reanuda los VideoCapture y threats de la nueva escena (si los hay)
-    std::vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( val );
+    vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( val );
     for ( int i = 0; i < ( int )escena_actual->size(); i++ )
     {
         if ( escena_actual->at( i ).is_camara )
         {
             escena_actual->at( i ).camara->open( escena_actual->at( i ).id_source );
+
+            // Ponemos el last_frame a negro para evitar que se vea el último frame que se obtuvo cuando estuvo
+            // la escena activa por última vez (hasta que la cámara vuelva a estar lista)
+            int height = escena_actual->at( i ).camara->get( CAP_PROP_FRAME_HEIGHT );
+            int width = escena_actual->at( i ).camara->get( CAP_PROP_FRAME_WIDTH );
+            escena_actual->at( i ).last_frame = Mat( Size( width, height ), CV_8UC3, Scalar( 0, 0, 0 ) );
+
             if ( escena_actual->at( i ).detectar_fondo )
             {
                 switch_FCN_NET( true, val, i );
@@ -895,7 +929,7 @@ void MainWindow::escenas_lista_Select_Signal( int val )
 void MainWindow::anadir_escena_Btn_Signal()
 {
     // Añadimos un vector de elemento_visual (nuestra escena)
-    std::vector<elemento_visual> nueva;
+    vector<elemento_visual> nueva;
     lista_eltos_visuales.insert( lista_eltos_visuales.end(), nueva );
 
     numero_escenas++;
@@ -928,11 +962,156 @@ void MainWindow::borrar_escena_Btn_Signal()
     gestion_interfaz( false );
 }
 
+void MainWindow::renombrar_escena_Btn_Signal()
+{
+    ui->Escena_Renombrar->setHidden( false );
+    ui->Escena_Botones->setHidden( true );
+    ui->Renombrar_Escena_TextEdit->setPlainText( "" );
+}
+
+void MainWindow::cancelar_renombrar_escena_Btn_Signal()
+{
+    ui->Escena_Renombrar->setHidden( true );
+    ui->Escena_Botones->setHidden( false );
+}
+
+void MainWindow::aceptar_renombrar_escena_Btn_Signal()
+{
+    QListWidgetItem *escena = ui->Escenas_Lista->currentItem();
+    escena->setText( ui->Renombrar_Escena_TextEdit->toPlainText() );
+    ui->Escena_Renombrar->setHidden( true );
+    ui->Escena_Botones->setHidden( false );
+}
+
+void MainWindow::renombrar_Changed_Signal()
+{
+    QString texto = ui->Renombrar_Escena_TextEdit->toPlainText();
+    if ( texto.contains( "\n" ) )
+    {
+        texto = texto.replace( "\n", "" );
+    }
+    if ( texto.length() > 30 )
+    {
+        texto = texto.mid( 0, 30 );
+    }
+    if ( texto != ui->Renombrar_Escena_TextEdit->toPlainText() )
+    {
+        ui->Renombrar_Escena_TextEdit->setPlainText( texto );
+        QTextCursor cursor = ui->Renombrar_Escena_TextEdit->textCursor();
+        cursor.movePosition( QTextCursor::End );
+        ui->Renombrar_Escena_TextEdit->setTextCursor( cursor );
+    }
+}
+
+void MainWindow::exportar_escena_Btn_Signal()
+{
+    try
+    {
+        QString escena_text = ui->Escenas_Lista->currentItem()->text();
+        QString fileName = QFileDialog::getSaveFileName( this, ( "Save File" ), "/home/" + escena_text + ".scene", "*.scene" );
+        if ( fileName.isNull() == false )
+        {
+            // Abrimos el archivo y guardamos el nombre de la escena
+            ofstream file;
+            file.open( fileName.toStdString(), fstream::trunc );
+            file << escena_text.toStdString();
+
+            for ( int i = 0; i < ( int )lista_eltos_visuales.at( escena_index ).size(); i++ )
+            {
+                elemento_visual elto = lista_eltos_visuales.at( escena_index ).at( i );
+                qreal q1, q2, q3, q4;
+                elto.recorte.getRect( &q1, &q2, &q3, &q4 );
+
+                // Escribimos en cada linea un elemento visual
+                file << "\n" << elto.x << ";" << elto.y << ";" << elto.width << ";" << elto.height << ";"
+                     << elto.nombre.toStdString() << ";" << elto.is_camara << ";" << elto.id_source << ";" << elto.ocultar << ";"
+                     << elto.detectar_fondo << ";" << elto.fondo_borroso << ";"
+                     << elto.escala_grises << ";" << elto.R << ";" << elto.G << ";" << elto.B << ";"
+                     << elto.filtro_mediana << ";" << elto.ecualizado << ";"
+                     << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
+                     << elto.perspectiva << ";" << elto.rotacion;
+            }
+            file.close();
+        }
+    }
+    catch ( Exception )
+    {
+        qDebug() << "Error al guardar la escena";
+    }
+}
+
+void MainWindow::importar_escena_Btn_Signal()
+{
+    try
+    {
+        QString fileName = QFileDialog::getOpenFileName( this, ( "Open File" ), "/home", "*.scene" );
+        if ( fileName.isNull() == false )
+        {
+            // Abrimos el archivo y leemos el nombre de la escena
+            String str;
+            ifstream file;
+            file.open( fileName.toStdString() );
+            getline( file, str );
+
+            // Añadimos un vector de elemento_visual (nuestra escena)
+            lista_eltos_visuales.insert( lista_eltos_visuales.end(), vector<elemento_visual>() );
+            numero_escenas++;
+            ui->Escenas_Lista->addItem( QString::fromStdString( str ) );
+
+            while ( file.eof() == false )
+            {
+                // Leemos una linea (un elemento visual) y obtenemos los valores de las variables (separados por ';')
+                getline( file, str );
+                vector<string> values = split_string( str, ';' );
+                elemento_visual elto;
+
+                elto.x = stoi( values[0] );
+                elto.y = stoi( values[1] );
+                elto.width = stoi( values[2] );
+                elto.height = stoi( values[3] );
+                elto.nombre = QString::fromStdString( values[4] );
+                elto.is_camara = ( values[5] == "1" );
+                elto.id_source = stoll( values[6] );
+                elto.ocultar = ( values[7] == "1" );
+                elto.detectar_fondo = ( values[8] == "1" );
+                elto.fondo_borroso = ( values[9] == "1" );
+                elto.escala_grises = ( values[10] == "1" );
+                elto.R = stoi( values[11] );
+                elto.G = stoi( values[12] );
+                elto.B = stoi( values[13] );
+                elto.filtro_mediana = ( values[14] == "1" );
+                elto.ecualizado = ( values[15] == "1" );
+
+                // Reemplazamos los '.' por ',' para que el stod haga correctamente la conversión
+                // Obtenemos los 4 valores de recorte (separados por '/')
+                replace( values[16].begin(), values[16].end(), '.', ',' );
+                vector<string> subvalues = split_string( values[16], '/' );
+                elto.recorte = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
+
+                elto.perspectiva = stoi( values[17] );
+                elto.rotacion = stoi( values[18] );
+
+                if ( elto.is_camara )
+                    elto.camara = new VideoCapture();
+
+                lista_eltos_visuales.at( lista_eltos_visuales.size() - 1 ).push_back( elto );
+            }
+
+            file.close();
+            gestion_interfaz( false );
+        }
+    }
+    catch ( Exception )
+    {
+        qDebug() << "Error al cargar la escena";
+    }
+}
+
 /* --- Acciones elementos --- */
 
 void MainWindow::flecha_arriba_Btn_Signal()
 {
-    std::vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( escena_index );
+    vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( escena_index );
 
     // Intercambiamos el elemento actual y el anterior
     swap( escena_actual->at( elemento_index ), escena_actual->at( elemento_index - 1 ) );
@@ -952,7 +1131,7 @@ void MainWindow::ocultar_elto_Btn_Signal()
 
 void MainWindow::flecha_abajo_Btn_Signal()
 {
-    std::vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( escena_index );
+    vector<elemento_visual> *escena_actual = &lista_eltos_visuales.at( escena_index );
 
     // Intercambiamos el elemento actual y el siguiente
     swap( escena_actual->at( elemento_index ), escena_actual->at( elemento_index + 1 ) );
@@ -987,7 +1166,7 @@ void MainWindow::resolucion_Signal( int val )
     {
         VID_WIDTH = wd_ant;
         VID_HEIGHT = hg_ant;
-        std::cerr << "Para cambiar la resolución cierra primero cualquier programa que esté usando el vídeo" << "\n";
+        cerr << "Para cambiar la resolución cierra primero cualquier programa que esté usando el vídeo" << "\n";
 
         for ( int i = 0; i < ( int ) resoluciones.size(); i++ )
         {
@@ -1003,7 +1182,7 @@ void MainWindow::resolucion_Signal( int val )
     // Reescalamos los elementos visuales
     if ( escena_index != -1 )
     {
-        std::vector<elemento_visual> *escena = &lista_eltos_visuales.at( escena_index );
+        vector<elemento_visual> *escena = &lista_eltos_visuales.at( escena_index );
         for ( int i = 0; i < ( int )escena->size(); i++ )
         {
             escena->at( i ).x = round( escena->at( i ).x * VID_WIDTH / wd_ant );
@@ -1033,7 +1212,7 @@ void MainWindow::compute_Signal()
     // Procesamos los elementos visuales
     if ( escena_index != -1 )
     {
-        std::vector<elemento_visual> *escena = &lista_eltos_visuales.at( escena_index );
+        vector<elemento_visual> *escena = &lista_eltos_visuales.at( escena_index );
         for ( int i = escena->size() - 1; i >= 0; i-- )
         {
             elemento_visual *elto = &escena->at( i );

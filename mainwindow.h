@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <string>
 
+#include <fstream>
+
 using namespace cv;
 using namespace std;
 
@@ -69,6 +71,9 @@ private:
     QPoint convertir_coords( QPoint point, bool modo );
     QRect convertir_coords( QRect rect, bool modo );
 
+    // Devuelve un vector de strings tras cortar el texto en cada delimitador
+    vector<string> split_string( string texto, char delimitador );
+
     Display *display;
 
     int numero_escenas = 0;
@@ -82,7 +87,7 @@ private:
     int VID_HEIGHT;
 
     // Lista de resoluciones
-    std::vector<pair<int, int>> resoluciones { {960, 540}, {1280, 720}, {1920, 1080} };
+    vector<pair<int, int>> resoluciones { {960, 540}, {1280, 720}, {1920, 1080} };
 
     // Establece la resolución de salida y configura el output de acuerdo con la resolución seleccionada
     // en index_res hay que especificar el index del elemento del vector "resoluciones"
@@ -117,7 +122,7 @@ private:
         int rotacion = 0;
     };
 
-    vector<std::vector<elemento_visual>> lista_eltos_visuales;
+    vector<vector<elemento_visual>> lista_eltos_visuales;
 
     // Indica el index de la escena seleccionada, -1 si no hay ninguna
     int escena_index = -1;
@@ -181,6 +186,12 @@ public slots:
     void escenas_lista_Select_Signal( int val );
     void anadir_escena_Btn_Signal();
     void borrar_escena_Btn_Signal();
+    void renombrar_escena_Btn_Signal();
+    void cancelar_renombrar_escena_Btn_Signal();
+    void aceptar_renombrar_escena_Btn_Signal();
+    void renombrar_Changed_Signal();
+    void exportar_escena_Btn_Signal();
+    void importar_escena_Btn_Signal();
 
     /* --- Acciones elementos --- */
     void flecha_arriba_Btn_Signal();
