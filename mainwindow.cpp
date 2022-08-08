@@ -1009,30 +1009,31 @@ void MainWindow::exportar_escena_Btn_Signal()
     {
         QString escena_text = ui->Escenas_Lista->currentItem()->text();
         QString fileName = QFileDialog::getSaveFileName( this, ( "Save File" ), "/home/" + escena_text + ".scene", "*.scene" );
-        if ( fileName.isNull() == false )
+
+        if ( fileName.isNull() )
+            return;
+
+        // Abrimos el archivo y guardamos el nombre de la escena
+        ofstream file;
+        file.open( fileName.toStdString(), fstream::trunc );
+        file << escena_text.toStdString();
+
+        for ( int i = 0; i < ( int )lista_eltos_visuales.at( escena_index ).size(); i++ )
         {
-            // Abrimos el archivo y guardamos el nombre de la escena
-            ofstream file;
-            file.open( fileName.toStdString(), fstream::trunc );
-            file << escena_text.toStdString();
+            elemento_visual elto = lista_eltos_visuales.at( escena_index ).at( i );
+            qreal q1, q2, q3, q4;
+            elto.recorte.getRect( &q1, &q2, &q3, &q4 );
 
-            for ( int i = 0; i < ( int )lista_eltos_visuales.at( escena_index ).size(); i++ )
-            {
-                elemento_visual elto = lista_eltos_visuales.at( escena_index ).at( i );
-                qreal q1, q2, q3, q4;
-                elto.recorte.getRect( &q1, &q2, &q3, &q4 );
-
-                // Escribimos en cada linea un elemento visual
-                file << "\n" << elto.x << ";" << elto.y << ";" << elto.width << ";" << elto.height << ";"
-                     << elto.nombre.toStdString() << ";" << elto.is_camara << ";" << elto.id_source << ";" << elto.ocultar << ";"
-                     << elto.detectar_fondo << ";" << elto.fondo_borroso << ";"
-                     << elto.escala_grises << ";" << elto.R << ";" << elto.G << ";" << elto.B << ";"
-                     << elto.filtro_mediana << ";" << elto.ecualizado << ";"
-                     << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
-                     << elto.perspectiva << ";" << elto.rotacion;
-            }
-            file.close();
+            // Escribimos en cada linea un elemento visual
+            file << "\n" << elto.x << ";" << elto.y << ";" << elto.width << ";" << elto.height << ";"
+                 << elto.nombre.toStdString() << ";" << elto.is_camara << ";" << elto.id_source << ";" << elto.ocultar << ";"
+                 << elto.detectar_fondo << ";" << elto.fondo_borroso << ";"
+                 << elto.escala_grises << ";" << elto.R << ";" << elto.G << ";" << elto.B << ";"
+                 << elto.filtro_mediana << ";" << elto.ecualizado << ";"
+                 << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
+                 << elto.perspectiva << ";" << elto.rotacion;
         }
+        file.close();
     }
     catch ( Exception )
     {
@@ -1045,61 +1046,62 @@ void MainWindow::importar_escena_Btn_Signal()
     try
     {
         QString fileName = QFileDialog::getOpenFileName( this, ( "Open File" ), "/home", "*.scene" );
-        if ( fileName.isNull() == false )
+
+        if ( fileName.isNull() )
+            return;
+
+        // Abrimos el archivo y leemos el nombre de la escena
+        String str;
+        ifstream file;
+        file.open( fileName.toStdString() );
+        getline( file, str );
+
+        // Añadimos un vector de elemento_visual (nuestra escena)
+        lista_eltos_visuales.insert( lista_eltos_visuales.end(), vector<elemento_visual>() );
+        numero_escenas++;
+        ui->Escenas_Lista->addItem( QString::fromStdString( str ) );
+
+        while ( file.eof() == false )
         {
-            // Abrimos el archivo y leemos el nombre de la escena
-            String str;
-            ifstream file;
-            file.open( fileName.toStdString() );
+            // Leemos una linea (un elemento visual) y obtenemos los valores de las variables (separados por ';')
             getline( file, str );
+            vector<string> values = split_string( str, ';' );
+            elemento_visual elto;
 
-            // Añadimos un vector de elemento_visual (nuestra escena)
-            lista_eltos_visuales.insert( lista_eltos_visuales.end(), vector<elemento_visual>() );
-            numero_escenas++;
-            ui->Escenas_Lista->addItem( QString::fromStdString( str ) );
+            elto.x = stoi( values[0] );
+            elto.y = stoi( values[1] );
+            elto.width = stoi( values[2] );
+            elto.height = stoi( values[3] );
+            elto.nombre = QString::fromStdString( values[4] );
+            elto.is_camara = ( values[5] == "1" );
+            elto.id_source = stoll( values[6] );
+            elto.ocultar = ( values[7] == "1" );
+            elto.detectar_fondo = ( values[8] == "1" );
+            elto.fondo_borroso = ( values[9] == "1" );
+            elto.escala_grises = ( values[10] == "1" );
+            elto.R = stoi( values[11] );
+            elto.G = stoi( values[12] );
+            elto.B = stoi( values[13] );
+            elto.filtro_mediana = ( values[14] == "1" );
+            elto.ecualizado = ( values[15] == "1" );
 
-            while ( file.eof() == false )
-            {
-                // Leemos una linea (un elemento visual) y obtenemos los valores de las variables (separados por ';')
-                getline( file, str );
-                vector<string> values = split_string( str, ';' );
-                elemento_visual elto;
+            // Reemplazamos los '.' por ',' para que el stod haga correctamente la conversión
+            // Obtenemos los 4 valores de recorte (separados por '/')
+            replace( values[16].begin(), values[16].end(), '.', ',' );
+            vector<string> subvalues = split_string( values[16], '/' );
+            elto.recorte = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
 
-                elto.x = stoi( values[0] );
-                elto.y = stoi( values[1] );
-                elto.width = stoi( values[2] );
-                elto.height = stoi( values[3] );
-                elto.nombre = QString::fromStdString( values[4] );
-                elto.is_camara = ( values[5] == "1" );
-                elto.id_source = stoll( values[6] );
-                elto.ocultar = ( values[7] == "1" );
-                elto.detectar_fondo = ( values[8] == "1" );
-                elto.fondo_borroso = ( values[9] == "1" );
-                elto.escala_grises = ( values[10] == "1" );
-                elto.R = stoi( values[11] );
-                elto.G = stoi( values[12] );
-                elto.B = stoi( values[13] );
-                elto.filtro_mediana = ( values[14] == "1" );
-                elto.ecualizado = ( values[15] == "1" );
+            elto.perspectiva = stoi( values[17] );
+            elto.rotacion = stoi( values[18] );
 
-                // Reemplazamos los '.' por ',' para que el stod haga correctamente la conversión
-                // Obtenemos los 4 valores de recorte (separados por '/')
-                replace( values[16].begin(), values[16].end(), '.', ',' );
-                vector<string> subvalues = split_string( values[16], '/' );
-                elto.recorte = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
+            if ( elto.is_camara )
+                elto.camara = new VideoCapture();
 
-                elto.perspectiva = stoi( values[17] );
-                elto.rotacion = stoi( values[18] );
-
-                if ( elto.is_camara )
-                    elto.camara = new VideoCapture();
-
-                lista_eltos_visuales.at( lista_eltos_visuales.size() - 1 ).push_back( elto );
-            }
-
-            file.close();
-            gestion_interfaz( false );
+            lista_eltos_visuales.at( lista_eltos_visuales.size() - 1 ).push_back( elto );
         }
+
+        file.close();
+        gestion_interfaz( false );
     }
     catch ( Exception )
     {
