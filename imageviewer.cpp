@@ -87,6 +87,15 @@ void imageviewer::paintEvent( QPaintEvent * )
         painter.setBrush( Qt::transparent );
         painter.drawRect( c.rect );
     }
+    while ( cola_circulos.empty() == false )
+    {
+        circulo c = cola_circulos.front();
+        cola_circulos.pop();
+        pen.setColor( c.color );
+        painter.setPen( pen );
+        painter.setBrush( Qt::transparent );
+        painter.drawEllipse( c.centro, c.radio, c.radio );
+    }
 }
 
 void imageviewer::dibujar_cuadrado( QRect rect, QColor color )
@@ -95,6 +104,15 @@ void imageviewer::dibujar_cuadrado( QRect rect, QColor color )
     c.rect = QRect( rect.x() + pos_X, rect.y() + pos_Y, rect.width(), rect.height() );
     c.color = color;
     cola_cuadrados.push( c );
+}
+
+void imageviewer::dibujar_circulo( QPoint centro, int radio, QColor color )
+{
+    circulo c;
+    c.centro = QPoint( centro.x() + pos_X, centro.y() + pos_Y );
+    c.radio = radio;
+    c.color = color;
+    cola_circulos.push( c );
 }
 
 

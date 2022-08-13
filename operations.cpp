@@ -63,27 +63,101 @@ Mat rotation_transformation( Mat img, int val )
     return aux;
 }
 
-Mat perspective_transformation( Mat img, int val )
+Mat perspective_transformation( Mat img, QPointF p[4], QRectF section )
 {
-    // Porcentaje máximo de la foto que se va a estirar.
-    const float percent = 0.1;
+    // Ordenamos las coordenadas para que p_orden[3] sea la superior izquiera, [2] la inferior izquierda, [1] la superior derecha y [0] la inferior derecha
+    QPointF p_orden [4];
+    for ( int i = 0; i < 4; i++ )
+    {
+        // Calculamos cuantos puntos hay a la derecha y abajo de nuestro punto p[i]
+        int derecha = 0, abajo = 0;
+        for ( int j = 1; j < 4; j++ )
+        {
+            if ( p[i].x() < p[( i + j ) % 4].x() )
+                derecha++;
+            if ( p[i].y() < p[( i + j ) % 4].y() )
+                abajo++;
+        }
 
-    // Transformamos "val" en un valor absoluto, cantidad de píxeles que hay que desplazar los puntos
-    int val_abs = percent * val / 100 * img.cols;
+        // Hallamos la posición del array en la que tiene que estar el punto y calculamos las coordenadas absolutas
+        int posicion = ( derecha / 2 ) * 2 + ( abajo / 2 );
+        QPointF p_add = QPointF( p[i].x() * img.cols, p[i].y() * img.rows );
+        if ( p_orden[posicion] == QPointF() )
+        {
+            p_orden[posicion] = p_add;
+        }
+        else
+        {
+            // En el caso de que ya haya un punto en esa posición comprobamos cual de los dos puntos está más arriba o abajo
+            // en función de la posición (si es superior o inferior)
+            if ( ( posicion % 2 == 0 && abajo == 0 ) || ( posicion % 2 == 1 && abajo == 3 ) )
+            {
+                p_orden[abajo == 0 ? posicion + 1 : posicion - 1 ] = p_orden[posicion];
+                p_orden[posicion] = p_add;
+            }
+            else
+            {
+                p_orden[abajo == 0 ? posicion + 1 : posicion - 1 ] = p_add;
+            }
+        }
+    }
+
+    // Calculamos las coordenadas absolutas de la sección donde hay que centrar el resultado
+    QRect section_abs;
+    section_abs.setX( section.x() * img.cols );
+    section_abs.setWidth( section.width() * img.cols );
+    section_abs.setY( section.y() * img.rows );
+    section_abs.setHeight( section.height() * img.rows );
+
+    // Calculamos el rectángulo más pequeño que contenga los 4 puntos seleccionados
+    int x = min( {p_orden[0].x(), p_orden[1].x(), p_orden[2].x(), p_orden[3].x()} );
+    int y = min( {p_orden[0].y(), p_orden[1].y(), p_orden[2].y(), p_orden[3].y()} );
+    int width = max( {p_orden[0].x(), p_orden[1].x(), p_orden[2].x(), p_orden[3].x()} ) - x;
+    int height = max( {p_orden[0].y(), p_orden[1].y(), p_orden[2].y(), p_orden[3].y()} ) - y;
+
+    /* Reescalamos nuestro rectangulo (que contiene los puntos) para que quepa en la sección "section" y calculamos
+       el desplazamiento que tiene que tener cada punto tras la transformación
+    */
+    pair<int, int> dimensiones_adapt = adapt_size( pair<int, int> ( width, height ), section_abs.width(), section_abs.height(), true );
+    int diferencia_x = ( dimensiones_adapt.first - width ) / 2;
+    int diferencia_y = ( dimensiones_adapt.second - height ) / 2;
+
+    // Calculamos la distancia que hay que desplazar los puntos para que la selección (formada por los cuatro puntos) quede centrada en la sección "section"
+    int desp_x = ( section_abs.x() + ( section_abs.width() / 2 ) - ( width / 2 ) ) - x;
+    int desp_y = ( section_abs.y() + ( section_abs.height() / 2 ) - ( height / 2 ) ) - y;
+    for ( int i = 0; i < 4; i++ )
+    {
+        p_orden[i].setX( p_orden[i].x() + desp_x );
+        p_orden[i].setY( p_orden[i].y() + desp_y );
+    }
+
+    // Calculamos los puntos que conforman el rectángulo el cual contiene nuestra area seleccionada junto con un margen alrededor
+    int area_recortar_ini_x = max( 0, -desp_x );
+    int area_recortar_ini_y = max( 0, -desp_y );
+    int area_recortar_fin_x = min( img.cols - 1, img.cols - desp_x );
+    int area_recortar_fin_y = min( img.rows - 1, img.rows - desp_y );
+    Rect area_recortar = Rect( Point( area_recortar_ini_x, area_recortar_ini_y ), Point( area_recortar_fin_x, area_recortar_fin_y ) );
+
+    // Recortamos el área anteriormente citada y la colocamos centrada (respecto a "section") sobre una imagen negra
+    Mat aux = Mat( img.size(), img.type(), Scalar( 0, 0, 0 ) );
+    Mat img_recortada = Mat( img, area_recortar );
+    area_recortar.x += desp_x;
+    area_recortar.y += desp_y;
+    img_recortada.copyTo( aux( area_recortar ) );
 
     // Los puntos sin el número (a,b...) representan las 4 esquinas de la imagen original
     // Los otros puntos (a2,b2...) representan la posición de las 4 esquinas tras la transformación
-    Point2f a  = Point2f( img.cols * percent, 0 );
-    Point2f a2 = Point2f( img.cols * percent - val_abs, 0 );
+    Point2f a  = Point2f( p_orden[3].x(), p_orden[3].y() );
+    Point2f a2 = Point2f( p_orden[3].x() - diferencia_x, p_orden[3].y() - diferencia_y );
 
-    Point2f b  = Point2f( img.cols * ( 1 - percent ), 0 );
-    Point2f b2 = Point2f( img.cols * ( 1 - percent ) + val_abs, 0 );
+    Point2f b  = Point2f( p_orden[1].x(), p_orden[1].y() );
+    Point2f b2 = Point2f( p_orden[1].x() + diferencia_x, p_orden[1].y() - diferencia_y );
 
-    Point2f c  = Point2f( img.cols * percent, img.rows );
-    Point2f c2 = Point2f( img.cols * percent, img.rows );
+    Point2f c  = Point2f( p_orden[2].x(), p_orden[2].y() );
+    Point2f c2 = Point2f( p_orden[2].x() - diferencia_x, p_orden[2].y() + diferencia_y );
 
-    Point2f d  = Point2f( img.cols * ( 1 - percent ), img.rows );
-    Point2f d2 = Point2f( img.cols * ( 1 - percent ), img.rows );
+    Point2f d  = Point2f( p_orden[0].x(), p_orden[0].y() );
+    Point2f d2 = Point2f( p_orden[0].x() + diferencia_x, p_orden[0].y() + diferencia_y );
 
     // Calculamos la transformación de perspectiva
     Point2f from [4] = { a,  b,  c,  d  };
@@ -91,8 +165,7 @@ Mat perspective_transformation( Mat img, int val )
     Mat perspect_mat = getPerspectiveTransform( from, to );
 
     // Obtenemos la nueva imagen
-    Mat aux;
-    warpPerspective( img, aux, perspect_mat, img.size() );
+    warpPerspective( aux, aux, perspect_mat, img.size() );
     return aux;
 }
 
@@ -143,12 +216,12 @@ char *get_win_name( Display *disp, Window win )
     return ( char* )data;
 }
 
-pair<int, int> adapt_size( pair<int, int> size, int limit_width, int limit_height )
+pair<int, int> adapt_size( pair<int, int> size, int limit_width, int limit_height, bool expand )
 {
     int actual_width = size.first;
     int actual_height = size.second;
 
-    if ( actual_width > limit_width or actual_height > limit_height )
+    if ( actual_width > limit_width or actual_height > limit_height or expand )
     {
         int new_Width, new_Height;
 
@@ -211,7 +284,7 @@ bool get_cam_frame( VideoCapture *cam, Mat *image )
      * no cambiamos *image
      */
 
-    std::vector<int> ready_index;
+    vector<int> ready_index;
     bool cam_ready;
 
     try
@@ -305,7 +378,7 @@ int set_output_format( int output, int width, int height )
     // Comprobamos que el dispositivo de salida está abierto
     if ( output < 0 )
     {
-        std::cerr << "ERROR: No se ha podido abrir el dispositivo de salida: " << strerror( errno ) << "\n";
+        cerr << "ERROR: No se ha podido abrir el dispositivo de salida: " << strerror( errno ) << "\n";
         return -1;
     }
 
@@ -316,7 +389,7 @@ int set_output_format( int output, int width, int height )
     // Obtenemos el formato del dispositivo
     if ( ioctl( output, VIDIOC_G_FMT, &format_vid ) < 0 )
     {
-        std::cerr << "ERROR: No se ha podido obtener el formato de video: " << strerror( errno ) << "\n";
+        cerr << "ERROR: No se ha podido obtener el formato de video: " << strerror( errno ) << "\n";
         return -2;
     }
 
@@ -331,14 +404,14 @@ int set_output_format( int output, int width, int height )
     // Establecemos el formato
     if ( ioctl( output, VIDIOC_S_FMT, &format_vid ) < 0 )
     {
-        std::cerr << "ERROR: No se ha podido establecer el formato: " << strerror( errno ) << "\n";
+        cerr << "ERROR: No se ha podido establecer el formato: " << strerror( errno ) << "\n";
         return -3;
     }
 
     // Obtenemos el formado actual del dispositivo
     if ( ioctl( output, VIDIOC_G_FMT, &format_vid ) < 0 )
     {
-        std::cerr << "ERROR: No se ha podido obtener el formato de video: " << strerror( errno ) << "\n";
+        cerr << "ERROR: No se ha podido obtener el formato de video: " << strerror( errno ) << "\n";
         return -2;
     }
 

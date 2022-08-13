@@ -20,6 +20,9 @@ public:
     // Añade un cuadrado a la cola para dibujar de tamaño y coordenadas "rect" y color "color"
     void dibujar_cuadrado( QRect rect, QColor color );
 
+    // Añade un circulo a la cola para dibujar con centro "centro", radio "radio" y color "color"
+    void dibujar_circulo( QPoint centro, int radio, QColor color );
+
     // Cambia el mat que se va a dibujar
     void set_image( Mat *img );
 
@@ -41,7 +44,15 @@ private:
         QColor color;
     };
 
+    struct circulo
+    {
+        QPoint centro;
+        int radio;
+        QColor color;
+    };
+
     queue<cuadrado> cola_cuadrados;
+    queue<circulo> cola_circulos;
 
     bool seleccionando_window = false;
     bool seleccionando_interact = false;

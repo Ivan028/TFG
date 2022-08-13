@@ -62,7 +62,8 @@ MainWindow::MainWindow( QWidget *parent )
     connect( ui->Modo_Fondo_Btn, SIGNAL( clicked( bool ) ), this, SLOT( modo_fondo_Btn_Signal() ) );
     connect( ui->Recortar_Btn, SIGNAL( clicked( bool ) ), this, SLOT( recortar_Btn_Signal() ) );
     connect( ui->Eliminar_Recorte_Btn, SIGNAL( clicked( bool ) ), this, SLOT( eliminar_recorte_Btn_Signal() ) );
-    connect( ui->Salir_Btn, SIGNAL( clicked() ), this, SLOT( salir_Btn_Signal() ) );
+    connect( ui->Perspectiva_Btn, SIGNAL( clicked( bool ) ), this, SLOT( perspectiva_Btn_Signal( ) ) );
+    connect( ui->Salir_Btn, SIGNAL( clicked( bool ) ), this, SLOT( salir_Btn_Signal() ) );
 
     /* --- Elementos --- */
     connect( ui->Elementos_Lista, SIGNAL( currentRowChanged( int ) ), this, SLOT( elementos_lista_Select_Signal( int ) ) );
@@ -112,7 +113,6 @@ void MainWindow::mem_to_ui()
     ui->Filtro_Mediana_Btn->setChecked( elto_vi->filtro_mediana );
     ui->Ecualizado_Btn->setChecked( elto_vi->ecualizado );
     ui->Detectar_Fondo_Btn->setChecked( elto_vi->detectar_fondo );
-    ui->Perspectiva_Slider->setValue( elto_vi->perspectiva );
     ui->Rotacion_Slider->setValue( elto_vi->rotacion );
 }
 
@@ -131,7 +131,6 @@ void MainWindow::ui_to_mem()
     elto_vi->filtro_mediana = ui->Filtro_Mediana_Btn->isChecked();
     elto_vi->ecualizado = ui->Ecualizado_Btn->isChecked();
     elto_vi->detectar_fondo = ui->Detectar_Fondo_Btn->isChecked();
-    elto_vi->perspectiva = ui->Perspectiva_Slider->value();
     elto_vi->rotacion = ui->Rotacion_Slider->value();
 }
 
@@ -145,6 +144,26 @@ vector<string> MainWindow::split_string( string texto, char delimitador )
         elementos.push_back( str );
     }
     return elementos;
+}
+
+QPointF MainWindow::coords_relativas_elemento( elemento_visual elto, QPointF point, bool modo )
+{
+    QPoint inicio_elto = QPoint( elto.x, elto.y );
+    float width_elto = elto.width;
+    float height_elto = elto.height;
+
+    if ( elto.recorte.isEmpty() == false )
+    {
+        width_elto = width_elto / elto.recorte.width();
+        height_elto = height_elto / elto.recorte.height();
+        inicio_elto.setX( inicio_elto.x() - elto.recorte.x() * width_elto );
+        inicio_elto.setY( inicio_elto.y() - elto.recorte.y() * height_elto );
+    }
+
+    if ( modo )
+        return QPointF( ( point.x() - inicio_elto.x() ) / width_elto, ( point.y() - inicio_elto.y() ) / height_elto );
+
+    return QPointF( point.x() * width_elto + inicio_elto.x(), point.y() * height_elto + inicio_elto.y() );
 }
 
 /* ---  Gestión interfaz  --- */
@@ -184,6 +203,19 @@ void MainWindow::gestion_interfaz_seccion_editar()
     else
     {
         ui->Eliminar_Recorte_Btn->setHidden( false );
+    }
+
+    if ( elto_actual->perspectiva[3] != QPointF() )
+    {
+        ui->Perspectiva_Btn->setText( "Restablecer Perspect." );
+    }
+    else if ( ui->Perspectiva_Btn->isChecked() == true )
+    {
+        ui->Perspectiva_Btn->setText( "Cancelar" );
+    }
+    else
+    {
+        ui->Perspectiva_Btn->setText( "Cambiar Perspectiva" );
     }
 }
 
@@ -462,14 +494,17 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
     frame = rotation_transformation( frame, elto.rotacion );
     mascara = rotation_transformation( mascara, elto.rotacion );
 
+    if ( elto.perspectiva[3] != QPointF() )
+    {
+        frame = perspective_transformation( frame, elto.perspectiva, elto.region_perspectiva );
+        mascara = perspective_transformation( mascara, elto.perspectiva, elto.region_perspectiva );
+    }
+
     if ( elto.recorte.isEmpty() == false )
     {
         frame = recortar_video_relativo( frame, elto.recorte );
         mascara = recortar_video_relativo( mascara, elto.recorte );
     }
-
-    frame = perspective_transformation( frame, elto.perspectiva );
-    mascara = perspective_transformation( mascara, elto.perspectiva );
 
     if ( elto.escala_grises )
     {
@@ -528,6 +563,10 @@ void MainWindow::select_window_Signal( QRect rect )
 
     win_selected = true;
 
+    // Desactiva el cambio de perspectiva
+    ui->Perspectiva_Btn->setChecked( false );
+    gestion_interfaz( false );
+
     // Si alguno de los dos son invalidos entonces descartamos la selección
     if ( selected_rect.width() <= 0 || selected_rect.height() <= 0 )
         win_selected = false;
@@ -540,6 +579,7 @@ void MainWindow::deselect_window_Signal()
 
 void MainWindow::window_interact_start_Signal( QPoint point )
 {
+    // Desactiva la selección de recorte
     win_selected = false;
     tipo_interaccion = 0;
 
@@ -557,6 +597,31 @@ void MainWindow::window_interact_start_Signal( QPoint point )
     // Definimos las areas de interacción: todo el elto (mover) y la esquina inferior derecha (reescalar)
     QRect elemento = QRect( inicio_elto, fin_elto );
     QRect esquina_inf_der = QRect( fin_elto.x() - 30, fin_elto.y() - 30, 40, 40 );
+
+
+    // Cambio de Perspectiva
+    if ( ui->Perspectiva_Btn->isChecked() && elemento.contains( point ) )
+    {
+        // Convertimos el punto clicado en coordenadas relativas al elemento (si el punto está dentro) y lo guardamos
+        QPointF coords_rel = coords_relativas_elemento( *elto_actual, point, true );
+        QPointF *p = elto_actual->perspectiva;
+        int punto_actual = p[0] == QPointF() ? 0 : p[1] == QPointF() ? 1 : p[2] == QPointF() ? 2 : 3;
+        p[punto_actual] = coords_rel;
+
+        if ( punto_actual != 3 )
+            return;
+
+        // Guardamos la region de la perspectiva (el area de la imagen que será visible y donde se centrará el resultado del cambio de la perspectiva)
+        elto_actual->region_perspectiva = QRectF( 0, 0, 1, 1 );
+        if ( elto_actual->recorte.isEmpty() == false )
+            elto_actual->region_perspectiva = elto_actual->recorte;
+
+        ui->Perspectiva_Btn->setChecked( false );
+        gestion_interfaz( false );
+
+        return;
+    }
+
 
     if ( esquina_inf_der.contains( point ) )
     {
@@ -706,11 +771,38 @@ void MainWindow::eliminar_recorte_Btn_Signal()
     gestion_interfaz( false );
 }
 
+void MainWindow::perspectiva_Btn_Signal( )
+{
+    elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+    // Restablece la perspectiva
+    if ( elto_actual->perspectiva[3] != QPointF() )
+    {
+        elto_actual->perspectiva[0] = QPointF();
+        elto_actual->perspectiva[1] = QPointF();
+        elto_actual->perspectiva[2] = QPointF();
+        elto_actual->perspectiva[3] = QPointF();
+        ui->Perspectiva_Btn->setChecked( false );
+    }
+    // Inicia el cambio de perspectiva
+    else if ( ui->Perspectiva_Btn->isChecked() )
+    {
+        elto_actual->perspectiva[0] = QPointF();
+        elto_actual->perspectiva[1] = QPointF();
+        elto_actual->perspectiva[2] = QPointF();
+        elto_actual->perspectiva[3] = QPointF();
+    }
+    gestion_interfaz( false );
+}
+
 void MainWindow::salir_Btn_Signal()
 {
     // Oculta el panel de editar
     ui->Panel_Editor->setHidden( true );
     ui->Panel_General->setHidden( false );
+
+    // Desactivamos el cambio de perspectiva en proceso (si lo hay)
+    ui->Perspectiva_Btn->setChecked( false );
 
     //Guarda los valores
     editando_elto = false;
@@ -745,7 +837,7 @@ void MainWindow::anadir_elto_Btn_Signal( QAction *q_act )
 
         // Establecemos el tamaño del elemento
         pair<int, int> original_size = get_win_size( display, ev.id_source );
-        pair<int, int> adapted_size = ( original_size.first == -1 ? make_pair( 1, 1 ) : adapt_size( original_size, VID_WIDTH, VID_HEIGHT ) );
+        pair<int, int> adapted_size = ( original_size.first == -1 ? make_pair( 1, 1 ) : adapt_size( original_size, VID_WIDTH, VID_HEIGHT, false ) );
         ev.width = adapted_size.first;
         ev.height = adapted_size.second;
     }
@@ -761,7 +853,7 @@ void MainWindow::anadir_elto_Btn_Signal( QAction *q_act )
 
         // Establecemos el tamaño del elemento
         pair<int, int> original_size = get_win_size( display, ev.id_source );
-        pair<int, int> adapted_size = ( original_size.first == -1 ? make_pair( 1, 1 ) : adapt_size( original_size, VID_WIDTH, VID_HEIGHT ) );
+        pair<int, int> adapted_size = ( original_size.first == -1 ? make_pair( 1, 1 ) : adapt_size( original_size, VID_WIDTH, VID_HEIGHT, false ) );
         ev.width = adapted_size.first;
         ev.height = adapted_size.second;
     }
@@ -778,7 +870,7 @@ void MainWindow::anadir_elto_Btn_Signal( QAction *q_act )
 
         // Establecemos el tamaño del elemento
         pair<int, int> original_size = get_cam_size( ev.camara );
-        pair<int, int> adapted_size = ( original_size.first == -1 ? make_pair( 1, 1 ) : adapt_size( original_size, VID_WIDTH, VID_HEIGHT ) );
+        pair<int, int> adapted_size = ( original_size.first == -1 ? make_pair( 1, 1 ) : adapt_size( original_size, VID_WIDTH, VID_HEIGHT, false ) );
         ev.width = adapted_size.first;
         ev.height = adapted_size.second;
     }
@@ -1021,8 +1113,21 @@ void MainWindow::exportar_escena_Btn_Signal()
         for ( int i = 0; i < ( int )lista_eltos_visuales.at( escena_index ).size(); i++ )
         {
             elemento_visual elto = lista_eltos_visuales.at( escena_index ).at( i );
+
+            // Obtenemos los valores del rectangulo de recorte y region_perspectiva para exportarlos
             qreal q1, q2, q3, q4;
             elto.recorte.getRect( &q1, &q2, &q3, &q4 );
+            qreal p1, p2, p3, p4;
+            elto.region_perspectiva.getRect( &p1, &p2, &p3, &p4 );
+
+            // Obtenemos los valores de los puntos del cambio de perspectiva para exportarlos
+            // exportaremos cada punto como (-1, -1) si no hay cambio de perspectiva
+            float ps[8];
+            for ( int i = 0; i < 4; i++ )
+            {
+                ps[i * 2] = elto.perspectiva[3] == QPointF() ? -1 : elto.perspectiva[i].x();
+                ps[i * 2 + 1] = elto.perspectiva[3] == QPointF() ? -1 : elto.perspectiva[i].y();
+            }
 
             // Escribimos en cada linea un elemento visual
             file << "\n" << elto.x << ";" << elto.y << ";" << elto.width << ";" << elto.height << ";"
@@ -1031,7 +1136,9 @@ void MainWindow::exportar_escena_Btn_Signal()
                  << elto.escala_grises << ";" << elto.R << ";" << elto.G << ";" << elto.B << ";"
                  << elto.filtro_mediana << ";" << elto.ecualizado << ";"
                  << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
-                 << elto.perspectiva << ";" << elto.rotacion;
+                 << ps[0] << "/" << ps[1] << "/" << ps[2] << "/" << ps[3] << "/" << ps[4] << "/" << ps[5] << "/" << ps[6] << "/" << ps[7] << ";"
+                 << p1 << "/" << p2 << "/" << p3 << "/" << p4 << ";"
+                 << elto.rotacion;
         }
         file.close();
     }
@@ -1091,8 +1198,23 @@ void MainWindow::importar_escena_Btn_Signal()
             vector<string> subvalues = split_string( values[16], '/' );
             elto.recorte = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
 
-            elto.perspectiva = stoi( values[17] );
-            elto.rotacion = stoi( values[18] );
+            // Obtenemos los valores de perspectiva (separados por '/'), si son validos los guardamos
+            replace( values[17].begin(), values[17].end(), '.', ',' );
+            subvalues = split_string( values[17], '/' );
+            if ( subvalues[6] != "-1" )
+            {
+                elto.perspectiva[0] = QPointF( stof( subvalues[0] ), stof( subvalues[1] ) );
+                elto.perspectiva[1] = QPointF( stof( subvalues[2] ), stof( subvalues[3] ) );
+                elto.perspectiva[2] = QPointF( stof( subvalues[4] ), stof( subvalues[5] ) );
+                elto.perspectiva[3] = QPointF( stof( subvalues[6] ), stof( subvalues[7] ) );
+            }
+
+            // Obtenemos los 4 valores de region_perspectiva (separados por '/')
+            replace( values[18].begin(), values[18].end(), '.', ',' );
+            subvalues = split_string( values[18], '/' );
+            elto.region_perspectiva = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
+
+            elto.rotacion = stoi( values[19] );
 
             if ( elto.is_camara )
                 elto.camara = new VideoCapture();
@@ -1252,9 +1374,26 @@ void MainWindow::compute_Signal()
     }
     write( output, output_image.data, VID_WIDTH * VID_HEIGHT * 1.5 );
 
-    // Mostramos la selección
+    // Mostramos la selección de recorte
     if ( win_selected )
         visor->dibujar_cuadrado( selected_rect, Qt::green );
+
+    // Mostramos los puntos del cambio de perspectiva
+    if ( ui->Perspectiva_Btn->isChecked() )
+    {
+        elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            if ( elto_actual->perspectiva[i] != QPointF() )
+            {
+                QPointF coords_abs = coords_relativas_elemento( *elto_actual, elto_actual->perspectiva[i], false );
+                // Convertimos las coordenadas del punto (de la imagen de salida) en coordenadas del visor
+                QPoint point = convertir_coords( coords_abs.toPoint(), false );
+                visor->dibujar_circulo( point, 4, Qt::green );
+            }
+        }
+    }
 
     visor->update();
 }

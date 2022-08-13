@@ -71,9 +71,6 @@ private:
     QPoint convertir_coords( QPoint point, bool modo );
     QRect convertir_coords( QRect rect, bool modo );
 
-    // Devuelve un vector de strings tras cortar el texto en cada delimitador
-    vector<string> split_string( string texto, char delimitador );
-
     Display *display;
 
     int numero_escenas = 0;
@@ -118,7 +115,8 @@ private:
         bool filtro_mediana = false;
         bool ecualizado = false;
         QRectF recorte;
-        int perspectiva = 0;
+        QPointF perspectiva[4];
+        QRectF region_perspectiva;
         int rotacion = 0;
     };
 
@@ -138,6 +136,13 @@ private:
     bool editando_elto = false;
     void mem_to_ui();
     void ui_to_mem();
+
+    // Devuelve un vector de strings tras cortar el texto en cada delimitador
+    vector<string> split_string( string texto, char delimitador );
+
+    // Convierte las coordenadas pasadas a coordenadas relativas con respecto al elemento (si "modo" = true)
+    // o a cordenadas absolutas a partir de las coordenadas relativas al elemento ("modo" = false)
+    QPointF coords_relativas_elemento( elemento_visual elto, QPointF point, bool modo );
 
     /* --- Interfaz --- */
     // Se encarga de gestionar la interfaz referente a la sección de editar y a la lista de elementos
@@ -173,6 +178,7 @@ public slots:
     void modo_fondo_Btn_Signal();
     void recortar_Btn_Signal();
     void eliminar_recorte_Btn_Signal();
+    void perspectiva_Btn_Signal( );
     void salir_Btn_Signal();
 
     /* --- Elementos --- */

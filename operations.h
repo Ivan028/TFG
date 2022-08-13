@@ -88,10 +88,11 @@ Mat filtro_mediana( Mat img );
  */
 Mat rotation_transformation( Mat img, int val );
 
-/* Aplica a "img" una transformación de perspectiva, inclinará la parte superior de la imagen
- * "val" especifica de cuanto será esa transformación (en porcentaje)
+/* Aplica a "img" una transformación de perspectiva.
+ * El vector "p" contiene 4 puntos que son las 4 esquinas de la región que se va a transformar
+ * "section" es el rectángulo dentro de "img" donde se centrará el resultado
  */
-Mat perspective_transformation( Mat img, int val );
+Mat perspective_transformation( Mat img, QPointF p[4], QRectF section );
 
 /* Devuelve img modificando el canal de cada color.
  * Si el valor es < 100 dicho canal se verá atenuado. Por ejemplo si es 70 el canal se atenuará un 30%
@@ -111,11 +112,15 @@ Window *get_win_list( Display *disp, unsigned long *len );
  */
 char *get_win_name( Display *disp, Window win );
 
-/* Si las dimensiones en "size" no son mayores que "limit_width" y "limit_height" entonces devuelve "size" (ancho, alto)
+/* Con "expand" siendo false:
+ * Si las dimensiones en "size" no son mayores que "limit_width" y "limit_height" entonces devuelve "size" (ancho, alto)
  * Si no, devuelve las dimensiones adaptadas a partir de las proporcionadas en "size", las nuevas dimensiones
- * tendrá la misma proporción pero reducidas para que sean menores que "limit_width", "limit_height"
+ * tendrá la misma proporción pero reducidas para que sean menores o iguales que "limit_width", "limit_height"
+ *
+ * Si "expand" es true entonces adaptará las dimensiones en "size" para que ocupen el máximo posible dentro de los limites
+ * "limit_width" y "limit_height" manteniendo la proporción.
  */
-pair<int, int> adapt_size( pair<int, int> size, int limit_width, int limit_height );
+pair<int, int> adapt_size( pair<int, int> size, int limit_width, int limit_height, bool expand );
 
 /* Devuelve un par de enteros con las dimensiones ancho y alto (por ese orden) de win
  * Si la ventana no existe devolverá un par de enteros -1, -1.
