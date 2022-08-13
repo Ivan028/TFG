@@ -745,8 +745,8 @@ void MainWindow::recortar_Btn_Signal()
 
     // Calculamos el porcentaje de recorte (teniendo en cuenta para la x e y anteriores recortes)
     QRectF recorte;
-    recorte.setX( ( float( x ) + ( elto->recorte.isEmpty() ? 0 : elto->recorte.x() * total_width ) ) / total_width );
-    recorte.setY( ( float( y ) + ( elto->recorte.isEmpty() ? 0 : elto->recorte.y() * total_height ) ) / total_height );
+    recorte.setX( ( float( x ) + floor( elto->recorte.isEmpty() ? 0 : elto->recorte.x() * total_width ) ) / total_width );
+    recorte.setY( ( float( y ) + floor( elto->recorte.isEmpty() ? 0 : elto->recorte.y() * total_height ) ) / total_height );
     recorte.setWidth( float( width ) / total_width );
     recorte.setHeight( float( height ) / total_height );
 
