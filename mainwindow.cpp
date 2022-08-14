@@ -63,6 +63,7 @@ MainWindow::MainWindow( QWidget *parent )
     connect( ui->Recortar_Btn, SIGNAL( clicked( bool ) ), this, SLOT( recortar_Btn_Signal() ) );
     connect( ui->Eliminar_Recorte_Btn, SIGNAL( clicked( bool ) ), this, SLOT( eliminar_recorte_Btn_Signal() ) );
     connect( ui->Perspectiva_Btn, SIGNAL( clicked( bool ) ), this, SLOT( perspectiva_Btn_Signal( ) ) );
+    connect( ui->Aspect_ratio_CheckBox, SIGNAL( clicked( bool ) ), this, SLOT( aspect_ratio_Checkbox_Signal( bool ) ) );
     connect( ui->Salir_Btn, SIGNAL( clicked( bool ) ), this, SLOT( salir_Btn_Signal() ) );
 
     /* --- Elementos --- */
@@ -675,8 +676,18 @@ void MainWindow::window_interact_update_Signal( QPoint point )
         if ( point.y() > VID_HEIGHT )
             point.setY( VID_HEIGHT );
 
-        elto_actual->width = point.x();
-        elto_actual->height = point.y();
+        if ( ui->Aspect_ratio_CheckBox->isChecked() == false )
+        {
+            elto_actual->width = point.x();
+            elto_actual->height = point.y();
+        }
+        else
+        {
+            // Hay que mantener el aspecto ratio
+            pair<int, int> new_size = adapt_size( elto_actual->aspect_ratio, point.x(), point.y(), true );
+            elto_actual->width = new_size.first;
+            elto_actual->height = new_size.second;
+        }
     }
 
     mem_to_ui();
@@ -793,6 +804,16 @@ void MainWindow::perspectiva_Btn_Signal( )
         elto_actual->perspectiva[3] = QPointF();
     }
     gestion_interfaz( false );
+}
+
+void MainWindow::aspect_ratio_Checkbox_Signal( bool val )
+{
+    elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+    if ( val ) // Guardamos el aspecto-ratio
+        elto_actual->aspect_ratio = pair<int, int>( elto_actual->width, elto_actual->height );
+    else // Lo borramos
+        elto_actual->aspect_ratio = pair<int, int>( 0, 0 );
 }
 
 void MainWindow::salir_Btn_Signal()
@@ -932,8 +953,10 @@ void MainWindow::preparar_anadir_elto_Btn_Signal()
 
 void MainWindow::configurar_elto_Btn_Signal()
 {
+    elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
     // Habilita/Desabilita botones en función de si es una cámara
-    if ( lista_eltos_visuales.at( escena_index ).at( elemento_index ).is_camara )
+    if ( elto_actual->is_camara )
     {
         ui->Detectar_Fondo_Btn->setEnabled( true );
         ui->Modo_Fondo_Btn->setEnabled( true );
@@ -943,6 +966,9 @@ void MainWindow::configurar_elto_Btn_Signal()
         ui->Detectar_Fondo_Btn->setEnabled( false );
         ui->Modo_Fondo_Btn->setEnabled( false );
     }
+
+    // Marcamos el checkbox si el aspecto-ratio estaba bloqueado
+    ui->Aspect_ratio_CheckBox->setChecked( elto_actual->aspect_ratio.first != 0 );
 
     // Carga los valores a la ui
     editando_elto = true;

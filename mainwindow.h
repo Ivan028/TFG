@@ -118,6 +118,7 @@ private:
         QPointF perspectiva[4];
         QRectF region_perspectiva;
         int rotacion = 0;
+        pair<int, int> aspect_ratio = pair<int, int>( 0, 0 );
     };
 
     vector<vector<elemento_visual>> lista_eltos_visuales;
@@ -179,6 +180,7 @@ public slots:
     void recortar_Btn_Signal();
     void eliminar_recorte_Btn_Signal();
     void perspectiva_Btn_Signal( );
+    void aspect_ratio_Checkbox_Signal( bool val );
     void salir_Btn_Signal();
 
     /* --- Elementos --- */
