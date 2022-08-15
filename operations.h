@@ -91,6 +91,11 @@ Mat filtro_afilado( Mat img );
  */
 Mat erisionar( Mat img );
 
+/* Devuelve un mat con el area "area" pixelada
+ * Las coordenadas del area son relativas (en porcentaje)
+ */
+Mat pixelar( Mat img, QRectF area );
+
 /* Aplica a "img" una rotación  de "val" grados, si la imagen se está rotando entre 60 y 120 grados la escala de la imagen
  * se reducirá para que quepa verticalmente.
  */

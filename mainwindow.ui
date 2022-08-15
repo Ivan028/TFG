@@ -794,7 +794,10 @@
           <item>
            <widget class="QPushButton" name="Pixelacion_Btn">
             <property name="text">
-             <string>Pixelación</string>
+             <string>Pixelar Región</string>
+            </property>
+            <property name="checkable">
+             <bool>false</bool>
             </property>
            </widget>
           </item>

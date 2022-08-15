@@ -64,6 +64,7 @@ MainWindow::MainWindow( QWidget *parent )
     connect( ui->Eliminar_Recorte_Btn, SIGNAL( clicked( bool ) ), this, SLOT( eliminar_recorte_Btn_Signal() ) );
     connect( ui->Perspectiva_Btn, SIGNAL( clicked( bool ) ), this, SLOT( perspectiva_Btn_Signal( ) ) );
     connect( ui->Aspect_ratio_CheckBox, SIGNAL( clicked( bool ) ), this, SLOT( aspect_ratio_Checkbox_Signal( bool ) ) );
+    connect( ui->Pixelacion_Btn, SIGNAL( clicked( bool ) ), this, SLOT( pixelacion_Btn_Signal( ) ) );
     connect( ui->Salir_Btn, SIGNAL( clicked( bool ) ), this, SLOT( salir_Btn_Signal() ) );
 
     /* --- Elementos --- */
@@ -171,6 +172,59 @@ QPointF MainWindow::coords_relativas_elemento( elemento_visual elto, QPointF poi
     return QPointF( point.x() * width_elto + inicio_elto.x(), point.y() * height_elto + inicio_elto.y() );
 }
 
+QRect MainWindow::win_seleccion_absoluta( elemento_visual elto )
+{
+    if ( win_selected == false )
+        return QRect();
+
+    // Convertimos las coordenadas de la selección (del visor) en coordenadas de la imagen de salida
+    QRect rect_Adapt = convertir_coords( selected_rect, true );
+
+    /* Hallamos la intersección entre la selección del usuario y la imagen
+     * Si la intersección es inválida (el ancho o alto es 0) entonces devolvemos un QRect vacío
+     */
+    QRect intersect = rect_Adapt.intersected( QRect( elto.x, elto.y, elto.width, elto.height ) );
+    if ( intersect.width() <= 0 || intersect.height() <= 0 )
+        return QRect();
+
+    /* Calculamos las coordenadas de la selección (respecto de la imagen):
+     * x e y representan a cuantos pixeles del comienzo de la imagen inicia la selección
+     * el width y height representan el ancho y alto de la selección
+     */
+    QRect rect;
+    rect.setX( intersect.x() - elto.x );
+    rect.setY( intersect.y() - elto.y );
+    rect.setWidth( min( intersect.width(), elto.width - rect.x() ) );
+    rect.setHeight( min( intersect.height(), elto.height - rect.y() ) );
+
+    return rect;
+}
+
+QRectF MainWindow::win_seleccion_relativa( elemento_visual elto )
+{
+
+    QRect rect_abs = win_seleccion_absoluta( elto );
+
+    if ( rect_abs.isEmpty() )
+        return QRectF();
+
+    /* Hallamos el ancho y alto total de la imagen (incluido lo que está recortado) para
+     * tener los porcentajes de la misma base
+     */
+    int total_width = elto.width / ( elto.recorte.isEmpty() ? 1 : elto.recorte.width() );
+    int total_height = elto.height / ( elto.recorte.isEmpty() ? 1 : elto.recorte.height() );
+
+    // Calculamos las coordenadas de la selección en valor relativo
+    QRectF rect;
+    rect.setX( ( float( rect_abs.x() ) + floor( elto.recorte.isEmpty() ? 0 : elto.recorte.x() * total_width ) ) / total_width );
+    rect.setY( ( float( rect_abs.y() ) + floor( elto.recorte.isEmpty() ? 0 : elto.recorte.y() * total_height ) ) / total_height );
+    rect.setWidth( float( rect_abs.width() ) / total_width );
+    rect.setHeight( float( rect_abs.height() ) / total_height );
+
+    return rect;
+}
+
+
 /* ---  Gestión interfaz  --- */
 
 void MainWindow::gestion_interfaz_seccion_editar()
@@ -222,6 +276,16 @@ void MainWindow::gestion_interfaz_seccion_editar()
     {
         ui->Perspectiva_Btn->setText( "Cambiar Perspectiva" );
     }
+
+    if ( elto_actual->pixelacion.isEmpty() == true )
+    {
+        ui->Pixelacion_Btn->setText( "Pixelar Región" );
+    }
+    else
+    {
+        ui->Pixelacion_Btn->setText( "Cancelar Pixelación" );
+    }
+
 }
 
 void MainWindow::gestion_interfaz_escena( bool update_lista_eltos, int seleccionar = -1 )
@@ -499,6 +563,11 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
     frame = rotation_transformation( frame, elto.rotacion );
     mascara = rotation_transformation( mascara, elto.rotacion );
 
+    if ( elto.pixelacion.isEmpty() == false )
+    {
+        frame = pixelar( frame, elto.pixelacion );
+    }
+
     if ( elto.perspectiva[3] != QPointF() )
     {
         frame = perspective_transformation( frame, elto.perspectiva, elto.region_perspectiva );
@@ -734,54 +803,48 @@ void MainWindow::modo_fondo_Btn_Signal()
     gestion_interfaz( false );
 }
 
-void MainWindow::recortar_Btn_Signal()
+void MainWindow::pixelacion_Btn_Signal()
 {
-    if ( win_selected == false )
-        return;
-
-    win_selected = false;
-
     elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
-    // Convertimos las coordenadas de la selección (del visor) en coordenadas de la imagen de salida
-    QRect rect_Adapt = convertir_coords( selected_rect, true );
+    if ( elto->pixelacion.isEmpty() == false )
+    {
+        elto->pixelacion = QRectF();
+    }
+    else
+    {
+        // Obtenemos la selección y la desactivamos
+        QRectF rect = win_seleccion_relativa( *elto );
+        win_selected = false;
 
-    /* Hallamos la intersección entre la selección del usuario y la imagen
-     * Si el recorte es inválido (el ancho o alto de la selección es 0) entonces no hacemos el recorte
-     */
-    QRect intersect = rect_Adapt.intersected( QRect( elto->x, elto->y, elto->width, elto->height ) );
-    if ( intersect.width() <= 0 || intersect.height() <= 0 )
+        if ( rect.isEmpty() )
+            return;
+
+        elto->pixelacion = rect;
+    }
+
+    gestion_interfaz( false );
+}
+
+void MainWindow::recortar_Btn_Signal()
+{
+    elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+    // Obtenemos la selección y la desactivamos
+    QRect rect_abs = win_seleccion_absoluta( *elto );
+    QRectF rect_rel = win_seleccion_relativa( *elto );
+    win_selected = false;
+
+    if ( rect_abs.isEmpty() || rect_rel.isEmpty() )
         return;
 
-    /* Calculamos las coordenadas de la imagen recortada:
-     * x e y representan cuantos pixeles se recortan del inicio (de la imagen original)
-     * el width y height representan el ancho y alto de la nueva imagen
-     */
-    int x = max( 0, intersect.x() - elto->x );
-    int y = max( 0, intersect.y() - elto->y );
-    int width = min( intersect.width(), elto->width - x );
-    int height = min( intersect.height(), elto->height - y );
-
-    /* Hallamos el ancho y alto total de la imagen (incluido lo que está recortado) para
-     * tener los porcentajes de la misma base
-     */
-    int total_width = elto->width / ( elto->recorte.isEmpty() ? 1 : elto->recorte.width() );
-    int total_height = elto->height / ( elto->recorte.isEmpty() ? 1 : elto->recorte.height() );
-
-    // Calculamos el porcentaje de recorte (teniendo en cuenta para la x e y anteriores recortes)
-    QRectF recorte;
-    recorte.setX( ( float( x ) + floor( elto->recorte.isEmpty() ? 0 : elto->recorte.x() * total_width ) ) / total_width );
-    recorte.setY( ( float( y ) + floor( elto->recorte.isEmpty() ? 0 : elto->recorte.y() * total_height ) ) / total_height );
-    recorte.setWidth( float( width ) / total_width );
-    recorte.setHeight( float( height ) / total_height );
-
     // Ponemos las coordenadas al elemento
-    elto->x = ( x + elto->x );
-    elto->y = ( y + elto->y );
-    elto->width = width;
-    elto->height = height;
+    elto->x = rect_abs.x() + elto->x;
+    elto->y = rect_abs.y() + elto->y;
+    elto->width = rect_abs.width();
+    elto->height = rect_abs.height();
 
-    elto->recorte = recorte;
+    elto->recorte = rect_rel;
 
     mem_to_ui();
     gestion_interfaz( false );

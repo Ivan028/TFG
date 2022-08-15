@@ -64,6 +64,24 @@ Mat erisionar( Mat img )
     return aux;
 }
 
+Mat pixelar( Mat img, QRectF area )
+{
+    // Se calculan las coordenadas absolutas
+    Rect area_abs;
+    area_abs.x = round( area.x() * img.cols );
+    area_abs.y = round( area.y() * img.rows );
+    area_abs.width = round( area.width() * img.cols );
+    area_abs.height = round( area.height() * img.rows );
+
+    // Pixelamos el area
+    Mat aux = img.clone();
+    Mat img_recortada = Mat( img, area_abs );
+    cv::resize( img_recortada, img_recortada, Size( area_abs.width / 12, area_abs.height / 12 ), 0, 0, INTER_LINEAR );
+    cv::resize( img_recortada, img_recortada, Size( area_abs.width, area_abs.height ), 0, 0, INTER_NEAREST );
+    img_recortada.copyTo( aux( area_abs ) );
+    return aux;
+}
+
 Mat rotation_transformation( Mat img, int val )
 {
     Point centro = Point( img.cols / 2, img.rows / 2 );

@@ -120,6 +120,7 @@ private:
         QPointF perspectiva[4];
         QRectF region_perspectiva;
         int rotacion = 0;
+        QRectF pixelacion;
         pair<int, int> aspect_ratio = pair<int, int>( 0, 0 );
     };
 
@@ -146,6 +147,12 @@ private:
     // Convierte las coordenadas pasadas a coordenadas relativas con respecto al elemento (si "modo" = true)
     // o a cordenadas absolutas a partir de las coordenadas relativas al elemento ("modo" = false)
     QPointF coords_relativas_elemento( elemento_visual elto, QPointF point, bool modo );
+
+    // Devuelve un QRect que son las coordenadas absolutas de la selección (respecto del elemento)
+    QRect win_seleccion_absoluta( elemento_visual elto );
+
+    // Devuelve un QRect que son las coordenadas relativas (en porcentaje) de la selección (respecto del elemento)
+    QRectF win_seleccion_relativa( elemento_visual elto );
 
     /* --- Interfaz --- */
     // Se encarga de gestionar la interfaz referente a la sección de editar y a la lista de elementos
@@ -183,6 +190,7 @@ public slots:
     void eliminar_recorte_Btn_Signal();
     void perspectiva_Btn_Signal( );
     void aspect_ratio_Checkbox_Signal( bool val );
+    void pixelacion_Btn_Signal();
     void salir_Btn_Signal();
 
     /* --- Elementos --- */
