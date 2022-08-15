@@ -65,6 +65,7 @@ MainWindow::MainWindow( QWidget *parent )
     connect( ui->Perspectiva_Btn, SIGNAL( clicked( bool ) ), this, SLOT( perspectiva_Btn_Signal( ) ) );
     connect( ui->Aspect_ratio_CheckBox, SIGNAL( clicked( bool ) ), this, SLOT( aspect_ratio_Checkbox_Signal( bool ) ) );
     connect( ui->Pixelacion_Btn, SIGNAL( clicked( bool ) ), this, SLOT( pixelacion_Btn_Signal( ) ) );
+    connect( ui->Imagen_Fondo_Add_Btn, SIGNAL( clicked( bool ) ), this, SLOT( imagen_fondo_Btn_Signal( ) ) );
     connect( ui->Salir_Btn, SIGNAL( clicked( bool ) ), this, SLOT( salir_Btn_Signal() ) );
 
     /* --- Elementos --- */
@@ -246,13 +247,20 @@ void MainWindow::gestion_interfaz_seccion_editar()
         ui->Verde_Slider->setEnabled( true );
     }
 
-    if ( elto_actual->fondo_borroso == true )
+    if ( elto_actual->tipo_fondo == 0 )
     {
         ui->Modo_Fondo_Btn->setText( "Recortar Fondo" );
+        ui->Imagen_Fondo_Add_Btn->setVisible( false );
+    }
+    else if ( elto_actual->tipo_fondo == 1 )
+    {
+        ui->Modo_Fondo_Btn->setText( "Fondo Borroso" );
+        ui->Imagen_Fondo_Add_Btn->setVisible( false );
     }
     else
     {
-        ui->Modo_Fondo_Btn->setText( "Fondo Borroso" );
+        ui->Modo_Fondo_Btn->setText( "Imagen Fondo" );
+        ui->Imagen_Fondo_Add_Btn->setVisible( true );
     }
 
     if ( elto_actual->recorte.isEmpty() == true )
@@ -543,19 +551,26 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
 
     /* Si es una cámara con detección de fondo activada entonces:
      * Si está activado el fondo borroso lo aplicamos al frame
-     * Si no lo está copiamos la máscara de la red fcn
+     * Si lo está el recortar fondo: copiamos la máscara de la red fcn
+     * Si es la imagen fondo entonces recortamos usando la mascara y aplicamos una imagen debajo
      */
     if ( elto.is_camara && elto.detectar_fondo )
     {
         Mat mascara_fcn = elto.fcn->get_mask( elto.last_frame );
-        if ( elto.fondo_borroso )
+        if ( elto.tipo_fondo == 0 ) // Recortar Fondo
+        {
+            mascara = mascara_fcn;
+        }
+        else if ( elto.tipo_fondo == 1 ) // Fondo Borroso
         {
             blur( frame, frame, Size( 25, 25 ) );
             elto.last_frame.copyTo( frame, mascara_fcn );
         }
-        else
+        else // Imagen Fondo
         {
-            mascara = mascara_fcn;
+            frame = elto.imagen_fondo.clone();
+            cv::resize( frame, frame, mascara.size(), 0, 0, INTER_NEAREST );
+            elto.last_frame.copyTo( frame, mascara_fcn );
         }
     }
 
@@ -798,30 +813,7 @@ void MainWindow::modo_fondo_Btn_Signal()
     elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
     // Intercambiamos el estado del fondo borroso
-    elto_actual->fondo_borroso = ! elto_actual->fondo_borroso;
-
-    gestion_interfaz( false );
-}
-
-void MainWindow::pixelacion_Btn_Signal()
-{
-    elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
-
-    if ( elto->pixelacion.isEmpty() == false )
-    {
-        elto->pixelacion = QRectF();
-    }
-    else
-    {
-        // Obtenemos la selección y la desactivamos
-        QRectF rect = win_seleccion_relativa( *elto );
-        win_selected = false;
-
-        if ( rect.isEmpty() )
-            return;
-
-        elto->pixelacion = rect;
-    }
+    elto_actual->tipo_fondo = ( elto_actual->tipo_fondo + 1 ) % 3;
 
     gestion_interfaz( false );
 }
@@ -891,6 +883,52 @@ void MainWindow::aspect_ratio_Checkbox_Signal( bool val )
         elto_actual->aspect_ratio = pair<int, int>( elto_actual->width, elto_actual->height );
     else // Lo borramos
         elto_actual->aspect_ratio = pair<int, int>( 0, 0 );
+}
+
+void MainWindow::pixelacion_Btn_Signal()
+{
+    elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+    if ( elto->pixelacion.isEmpty() == false )
+    {
+        elto->pixelacion = QRectF();
+    }
+    else
+    {
+        // Obtenemos la selección y la desactivamos
+        QRectF rect = win_seleccion_relativa( *elto );
+        win_selected = false;
+
+        if ( rect.isEmpty() )
+            return;
+
+        elto->pixelacion = rect;
+    }
+
+    gestion_interfaz( false );
+}
+
+void MainWindow::imagen_fondo_Btn_Signal()
+{
+    try
+    {
+        QString fileName = QFileDialog::getOpenFileName( this, ( "Open File" ), "/home", ( "Images (*.png *.jpg)" ) );
+
+        if ( fileName.isNull() )
+            return;
+
+        elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+        // Cargamos la imagen y guardamos la ruta
+        Mat aux = cv::imread( fileName.toStdString().c_str(), IMREAD_COLOR );
+        cvtColor( aux, elto->imagen_fondo, COLOR_BGR2RGB );
+
+        elto->imagen_fondo_ruta = fileName;
+    }
+    catch ( Exception )
+    {
+        cerr << "Error al cargar la imagen";
+    }
 }
 
 void MainWindow::salir_Btn_Signal()
@@ -1235,7 +1273,7 @@ void MainWindow::exportar_escena_Btn_Signal()
             // Escribimos en cada linea un elemento visual
             file << "\n" << elto.x << ";" << elto.y << ";" << elto.width << ";" << elto.height << ";"
                  << elto.nombre.toStdString() << ";" << elto.is_camara << ";" << elto.id_source << ";" << elto.ocultar << ";"
-                 << elto.detectar_fondo << ";" << elto.fondo_borroso << ";"
+                 << elto.detectar_fondo << ";" << elto.tipo_fondo << ";"
                  << elto.escala_grises << ";" << elto.R << ";" << elto.G << ";" << elto.B << ";"
                  << elto.filtro_mediana << ";" << elto.ecualizado << ";"
                  << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
@@ -1247,7 +1285,7 @@ void MainWindow::exportar_escena_Btn_Signal()
     }
     catch ( Exception )
     {
-        qDebug() << "Error al guardar la escena";
+        cerr << "Error al guardar la escena";
     }
 }
 
@@ -1287,7 +1325,7 @@ void MainWindow::importar_escena_Btn_Signal()
             elto.id_source = stoll( values[6] );
             elto.ocultar = ( values[7] == "1" );
             elto.detectar_fondo = ( values[8] == "1" );
-            elto.fondo_borroso = ( values[9] == "1" );
+            elto.tipo_fondo = stoi( values[9] );
             elto.escala_grises = ( values[10] == "1" );
             elto.R = stoi( values[11] );
             elto.G = stoi( values[12] );
@@ -1330,7 +1368,7 @@ void MainWindow::importar_escena_Btn_Signal()
     }
     catch ( Exception )
     {
-        qDebug() << "Error al cargar la escena";
+        cerr << "Error al cargar la escena";
     }
 }
 

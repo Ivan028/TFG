@@ -107,7 +107,9 @@ private:
         Mat last_frame = Mat( Size( 1, 1 ), CV_8UC3, Scalar( 0, 0, 0 ) );
         bool ocultar = false;
         bool detectar_fondo = false;
-        bool fondo_borroso = true;
+        int tipo_fondo = 0;
+        QString imagen_fondo_ruta;
+        Mat imagen_fondo = Mat( Size( 1, 1 ), CV_8UC3, Scalar( 0, 0, 0 ) );;
         bool escala_grises = false;
         int R = 100;
         int G = 100;
@@ -191,6 +193,7 @@ public slots:
     void perspectiva_Btn_Signal( );
     void aspect_ratio_Checkbox_Signal( bool val );
     void pixelacion_Btn_Signal();
+    void imagen_fondo_Btn_Signal();
     void salir_Btn_Signal();
 
     /* --- Elementos --- */
