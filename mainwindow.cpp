@@ -9,6 +9,8 @@ MainWindow::MainWindow( QWidget *parent )
 {
     ui->setupUi( this );
 
+    QErrorMessage error_msg( this );
+
     win_selected = false;
     ui->Panel_Editor->setHidden( true );
     ui->Escena_Renombrar->setHidden( true );
@@ -822,6 +824,12 @@ void MainWindow::recortar_Btn_Signal()
 {
     elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
+    if ( win_selected == false )
+    {
+        error_msg.showMessage( "Es necesario seleccionar un area de recorte usando el clic derecho", "selecciona_area" );
+        return;
+    }
+
     // Obtenemos la selección y la desactivamos
     QRect rect_abs = win_seleccion_absoluta( *elto );
     QRectF rect_rel = win_seleccion_relativa( *elto );
@@ -888,6 +896,12 @@ void MainWindow::aspect_ratio_Checkbox_Signal( bool val )
 void MainWindow::pixelacion_Btn_Signal()
 {
     elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
+
+    if ( win_selected == false )
+    {
+        error_msg.showMessage( "Es necesario seleccionar un area para pixelar usando el clic derecho", "selecciona_area" );
+        return;
+    }
 
     if ( elto->pixelacion.isEmpty() == false )
     {
@@ -1432,6 +1446,7 @@ void MainWindow::resolucion_Signal( int val )
         VID_WIDTH = wd_ant;
         VID_HEIGHT = hg_ant;
         cerr << "Para cambiar la resolución cierra primero cualquier programa que esté usando el vídeo" << "\n";
+        error_msg.showMessage( "Para cambiar la resolución cierra primero cualquier programa que esté usando el vídeo", "cambiar_resolucion" );
 
         for ( int i = 0; i < ( int ) resoluciones.size(); i++ )
         {

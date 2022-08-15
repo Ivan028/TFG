@@ -38,6 +38,8 @@ public:
 private:
     Ui::MainWindow *ui;
 
+    QErrorMessage error_msg;
+
     QTimer timer;
 
     Mat visor_image, output_image, processed_image;
