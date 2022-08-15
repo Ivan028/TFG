@@ -574,9 +574,9 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="Filtro_Bilateral_Btn">
+           <widget class="QPushButton" name="Filtro_Afilado_Btn">
             <property name="text">
-             <string>Filtro Bilateral</string>
+             <string>Filtro Afilado</string>
             </property>
             <property name="checkable">
              <bool>true</bool>
@@ -584,9 +584,9 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="Laplacian_Btn">
+           <widget class="QPushButton" name="Erosionar_Btn">
             <property name="text">
-             <string>Laplacian</string>
+             <string>Erosionar</string>
             </property>
             <property name="checkable">
              <bool>true</bool>

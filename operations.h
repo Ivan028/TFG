@@ -83,6 +83,14 @@ Mat ecualizado( Mat img );
  */
 Mat filtro_mediana( Mat img );
 
+/* Devuelve img tras aplicar un filter2D con un kernel que hace que los bordes sean más marcados
+ */
+Mat filtro_afilado( Mat img );
+
+/* Devuelve img tras realizar una erosión a la imagen
+ */
+Mat erisionar( Mat img );
+
 /* Aplica a "img" una rotación  de "val" grados, si la imagen se está rotando entre 60 y 120 grados la escala de la imagen
  * se reducirá para que quepa verticalmente.
  */

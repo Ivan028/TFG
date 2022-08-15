@@ -114,6 +114,8 @@ private:
         int B = 100;
         bool filtro_mediana = false;
         bool ecualizado = false;
+        bool filtro_afilado = false;
+        bool erisionar = false;
         QRectF recorte;
         QPointF perspectiva[4];
         QRectF region_perspectiva;

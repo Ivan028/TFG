@@ -113,6 +113,8 @@ void MainWindow::mem_to_ui()
     ui->Azul_Slider->setValue( elto_vi->B );
     ui->Filtro_Mediana_Btn->setChecked( elto_vi->filtro_mediana );
     ui->Ecualizado_Btn->setChecked( elto_vi->ecualizado );
+    ui->Filtro_Afilado_Btn->setChecked( elto_vi->filtro_afilado );
+    ui->Erosionar_Btn->setChecked( elto_vi->erisionar );
     ui->Detectar_Fondo_Btn->setChecked( elto_vi->detectar_fondo );
     ui->Rotacion_Slider->setValue( elto_vi->rotacion );
 }
@@ -131,6 +133,8 @@ void MainWindow::ui_to_mem()
     elto_vi->B = ui->Azul_Slider->value();
     elto_vi->filtro_mediana = ui->Filtro_Mediana_Btn->isChecked();
     elto_vi->ecualizado = ui->Ecualizado_Btn->isChecked();
+    elto_vi->filtro_afilado = ui->Filtro_Afilado_Btn->isChecked();
+    elto_vi->erisionar = ui->Erosionar_Btn->isChecked();
     elto_vi->detectar_fondo = ui->Detectar_Fondo_Btn->isChecked();
     elto_vi->rotacion = ui->Rotacion_Slider->value();
 }
@@ -524,6 +528,16 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
     if ( elto.filtro_mediana )
     {
         frame = filtro_mediana( frame );
+    }
+
+    if ( elto.filtro_afilado )
+    {
+        frame = filtro_afilado( frame );
+    }
+
+    if ( elto.erisionar )
+    {
+        frame = erisionar( frame );
     }
 
     // Se reescala el frame y la mascara al tamaño configurado por el usuario

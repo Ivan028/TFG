@@ -45,6 +45,25 @@ Mat filtro_mediana( Mat img )
     return aux;
 }
 
+Mat filtro_afilado( Mat img )
+{
+    Mat aux;
+    float kernel_values[9] = {0, -1,  0,
+                              -1,  5, -1,
+                              0, -1,  0
+                             };
+    Mat kernel = Mat( 3, 3, CV_32F, kernel_values );
+    filter2D( img, aux, -1, kernel );
+    return aux;
+}
+
+Mat erisionar( Mat img )
+{
+    Mat aux;
+    erode( img, aux, getStructuringElement( MORPH_RECT, Size( 3, 3 ) ) );
+    return aux;
+}
+
 Mat rotation_transformation( Mat img, int val )
 {
     Point centro = Point( img.cols / 2, img.rows / 2 );
