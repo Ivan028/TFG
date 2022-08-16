@@ -93,39 +93,47 @@ private:
     // Devolverá el valor resultante de la llamada a "set_output_format"
     int establecer_resolucion( int index_res );
 
+    struct rotacion
+    {
+        QPointF centro;
+        int cantidad;
+    };
+
     struct elemento_visual
     {
-        int x = 0;
-        int y = 0;
-        int width = 1;
-        int height = 1;
+        int x                        = 0;
+        int y                        = 0;
+        int width                    = 1;
+        int height                   = 1;
         QString nombre;
         bool is_camara;
-        VideoCapture *camara = nullptr;
-        fcnmask *fcn = nullptr;
-        std::thread *thread = nullptr;
+        VideoCapture *camara         = nullptr;
+        fcnmask *fcn                 = nullptr;
+        std::thread *thread          = nullptr;
         // Es un long long para poder representar todos los valores de window (u long) y números negativos (pantalla completa)
-        long long id_source = 0;
-        Mat last_frame = Mat( Size( 1, 1 ), CV_8UC3, Scalar( 0, 0, 0 ) );
-        bool ocultar = false;
-        bool detectar_fondo = false;
-        int tipo_fondo = 0;
+        long long id_source          = 0;
+        Mat last_frame               = Mat( Size( 1, 1 ), CV_8UC3, Scalar( 0, 0, 0 ) );
+        bool ocultar                 = false;
+        bool detectar_fondo          = false;
+        int tipo_fondo               = 0;
         QString imagen_fondo_ruta;
-        Mat imagen_fondo = Mat( Size( 1, 1 ), CV_8UC3, Scalar( 0, 0, 0 ) );;
-        bool escala_grises = false;
-        int R = 100;
-        int G = 100;
-        int B = 100;
-        bool filtro_mediana = false;
-        bool ecualizado = false;
-        bool filtro_afilado = false;
-        bool erisionar = false;
+        Mat imagen_fondo             = Mat( Size( 1, 1 ), CV_8UC3, Scalar( 0, 0, 0 ) );
+        bool escala_grises           = false;
+        int R                        = 100;
+        int G                        = 100;
+        int B                        = 100;
+        bool filtro_mediana          = false;
+        bool ecualizado              = false;
+        bool filtro_afilado          = false;
+        bool erosionar               = false;
         QRectF recorte;
         QPointF perspectiva[4];
         QRectF region_perspectiva;
-        int rotacion = 0;
+        int rotacion_actual          = 0;
+        vector<rotacion> rotaciones;
+        vector<int> orden_proces     = {-1, -1, -1}; // [0]: Perspectiva, [1]: Pixelar, [2]: Recorte
         QRectF pixelacion;
-        pair<int, int> aspect_ratio = pair<int, int>( 0, 0 );
+        pair<int, int> aspect_ratio  = pair<int, int>( 0, 0 );
     };
 
     vector<vector<elemento_visual>> lista_eltos_visuales;
@@ -138,6 +146,15 @@ private:
     // Guarda en "processed_image" el elemento "elto" después de aplicar a "last_frame" las modificaciones especificadas
     // en el elemento
     void procesar_elemento_visual( elemento_visual elto );
+
+    // Añade la rotación actual al vector de rotaciones y configura el proceso para que se realice después de la rotación
+    void add_rotacion( elemento_visual *elto, int id_proces );
+
+    // Transforma las coordenadas relativas (respecto de la imagen) del punto "point" en coordenadas relativas respecto al recorte del elemento
+    QPointF transform_to_area_recorte( elemento_visual elto, QPointF point );
+    QRectF transform_to_area_recorte( elemento_visual elto, QRectF rect );
+    // Transforma los puntos en el array "point" y los almacena en "result". Hay que indicar el número de puntos en "n_puntos"
+    void transform_to_area_recorte( elemento_visual elto, QPointF *point, QPointF *result, int n_puntos );
 
     // "editando_elto" será True cuando se esté en la ventana de editar un elemento
     // La función "mem_to_ui" carga los valores del elemento_visual a la interfaz. "ui_to_mem" realiza el proceso contrario

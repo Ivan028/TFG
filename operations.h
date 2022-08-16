@@ -97,9 +97,9 @@ Mat erisionar( Mat img );
 Mat pixelar( Mat img, QRectF area );
 
 /* Aplica a "img" una rotación  de "val" grados, si la imagen se está rotando entre 60 y 120 grados la escala de la imagen
- * se reducirá para que quepa verticalmente.
+ * se reducirá para que quepa verticalmente. En "centro" están las coordenadas relativas (en porcentaje) del centro de la rotación
  */
-Mat rotation_transformation( Mat img, int val );
+Mat rotation_transformation( Mat img, int val, QPointF centro );
 
 /* Aplica a "img" una transformación de perspectiva.
  * El vector "p" contiene 4 puntos que son las 4 esquinas de la región que se va a transformar

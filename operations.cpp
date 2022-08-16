@@ -82,9 +82,9 @@ Mat pixelar( Mat img, QRectF area )
     return aux;
 }
 
-Mat rotation_transformation( Mat img, int val )
+Mat rotation_transformation( Mat img, int val, QPointF centro )
 {
-    Point centro = Point( img.cols / 2, img.rows / 2 );
+    Point centro_abs = Point( img.cols * centro.x(), img.rows * centro.y() );
     float escala = 1;
 
     // Si la imagen se está rotando un ángulo de entre 60º y 120º reducimos la escala para que entre verticalmente
@@ -92,7 +92,7 @@ Mat rotation_transformation( Mat img, int val )
         escala = float( img.rows ) / img.cols;
 
     // Calculamos la rotación
-    Mat rot_mat = getRotationMatrix2D( centro, val, escala );
+    Mat rot_mat = getRotationMatrix2D( centro_abs, val, escala );
 
     // Obtenemos la nueva imagen
     Mat aux;

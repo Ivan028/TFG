@@ -118,9 +118,9 @@ void MainWindow::mem_to_ui()
     ui->Filtro_Mediana_Btn->setChecked( elto_vi->filtro_mediana );
     ui->Ecualizado_Btn->setChecked( elto_vi->ecualizado );
     ui->Filtro_Afilado_Btn->setChecked( elto_vi->filtro_afilado );
-    ui->Erosionar_Btn->setChecked( elto_vi->erisionar );
+    ui->Erosionar_Btn->setChecked( elto_vi->erosionar );
     ui->Detectar_Fondo_Btn->setChecked( elto_vi->detectar_fondo );
-    ui->Rotacion_Slider->setValue( elto_vi->rotacion );
+    ui->Rotacion_Slider->setValue( elto_vi->rotacion_actual );
 }
 
 void MainWindow::ui_to_mem()
@@ -138,9 +138,9 @@ void MainWindow::ui_to_mem()
     elto_vi->filtro_mediana = ui->Filtro_Mediana_Btn->isChecked();
     elto_vi->ecualizado = ui->Ecualizado_Btn->isChecked();
     elto_vi->filtro_afilado = ui->Filtro_Afilado_Btn->isChecked();
-    elto_vi->erisionar = ui->Erosionar_Btn->isChecked();
+    elto_vi->erosionar = ui->Erosionar_Btn->isChecked();
     elto_vi->detectar_fondo = ui->Detectar_Fondo_Btn->isChecked();
-    elto_vi->rotacion = ui->Rotacion_Slider->value();
+    elto_vi->rotacion_actual = ui->Rotacion_Slider->value();
 }
 
 vector<string> MainWindow::split_string( string texto, char delimitador )
@@ -227,6 +227,66 @@ QRectF MainWindow::win_seleccion_relativa( elemento_visual elto )
     return rect;
 }
 
+void MainWindow::add_rotacion( elemento_visual *elto, int id_proces )
+{
+    // Configura el proceso "id_proces" para que se realice después de la rotación actual
+    elto->orden_proces[id_proces] = ( int )elto->rotaciones.size();
+
+    // Configuramos la rotación y la añadimos al vector de rotaciones
+    rotacion r;
+    r.cantidad = elto->rotacion_actual;
+    r.centro = coords_relativas_elemento( *elto, QPointF( elto->x + ( elto->width / 2.0 ), elto->y + ( elto->height / 2.0 ) ), true );
+    elto->rotaciones.push_back( r );
+
+    // Reseteamos la rotación actual
+    elto->rotacion_actual = 0;
+    mem_to_ui();
+}
+
+QPointF MainWindow::transform_to_area_recorte( elemento_visual elto, QPointF point )
+{
+    if ( elto.recorte.isEmpty() )
+        return point;
+
+    /* Hallamos el ancho y alto total de la imagen (incluido lo que está recortado) para
+     * tener los porcentajes de la misma base
+     */
+    int total_width = elto.width / ( elto.recorte.isEmpty() ? 1 : elto.recorte.width() );
+    int total_height = elto.height / ( elto.recorte.isEmpty() ? 1 : elto.recorte.height() );
+
+    // Ponemos el punto en coordenadas absolutas
+    QPointF p_abs;
+    p_abs.setX( point.x() * total_width );
+    p_abs.setY( point.y() * total_height );
+
+    // Obtenemos la región recortada (en coordenadas absolutas)
+    QRect r = QRect();
+    r.setX( elto.recorte.x() * total_width );
+    r.setY( elto.recorte.y() * total_height );
+    r.setWidth( elto.recorte.width() * total_width );
+    r.setHeight( elto.recorte.height() * total_height );
+
+    // Calcula las coordenadas relativas del punto con respecto al area recortada
+    float x = fmax( 0, fmin( 1, ( p_abs.x() - r.x() ) / r.width() ) );
+    float y = fmax( 0, fmin( 1, ( p_abs.y() - r.y() ) / r.height() ) );
+
+    return QPointF( x, y );
+}
+
+QRectF MainWindow::transform_to_area_recorte( elemento_visual elto, QRectF rect )
+{
+    QPointF p1 = transform_to_area_recorte( elto, rect.topLeft() );
+    QPointF p2 = transform_to_area_recorte( elto, rect.bottomRight() );
+    return QRectF ( p1, p2 );
+}
+
+void MainWindow::transform_to_area_recorte(  elemento_visual elto, QPointF *point, QPointF *result, int n_puntos  )
+{
+    for ( int i = 0; i < n_puntos; i++ )
+    {
+        result[i] = transform_to_area_recorte( elto, point[i] );
+    }
+}
 
 /* ---  Gestión interfaz  --- */
 
@@ -577,25 +637,62 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
     }
 
     // Aplicamos las modificaciones al frame
-    frame = rotation_transformation( frame, elto.rotacion );
-    mascara = rotation_transformation( mascara, elto.rotacion );
-
-    if ( elto.pixelacion.isEmpty() == false )
+    for ( int i = 0; i < ( int )elto.rotaciones.size(); i++ )
     {
-        frame = pixelar( frame, elto.pixelacion );
+        rotacion r = elto.rotaciones[i];
+
+        // Rotación
+        if ( r.cantidad != 0 )
+        {
+            QPointF centro = r.centro;
+            if ( elto.orden_proces[2] < i && elto.recorte.isEmpty() == false )
+                // Si se ha realizado un recorte previo entonces adaptamos el centro
+                centro = QPointF( 0.5, 0.5 );
+
+            frame = rotation_transformation( frame, r.cantidad, centro );
+            mascara = rotation_transformation( mascara, r.cantidad, centro );
+        }
+
+        // Perspectiva
+        if ( elto.orden_proces[0] == i && elto.perspectiva[3] != QPointF() )
+        {
+            QPointF perspectiva_recorte[4], *perspectiva = elto.perspectiva;
+            QRectF region_perspectiva = elto.region_perspectiva;
+
+            if ( elto.orden_proces[2] < i && elto.recorte.isEmpty() == false )
+            {
+                // Si se ha realizado un recorte previo entonces adaptamos las coordenadas
+                transform_to_area_recorte( elto, elto.perspectiva, perspectiva_recorte, 4 );
+                perspectiva = perspectiva_recorte;
+                region_perspectiva = transform_to_area_recorte( elto, elto.region_perspectiva );
+            }
+
+            frame = perspective_transformation( frame, perspectiva, region_perspectiva );
+            mascara = perspective_transformation( mascara, perspectiva, region_perspectiva );
+        }
+
+        // Pixelación
+        if ( elto.orden_proces[1] == i && elto.pixelacion.isEmpty() == false )
+        {
+            QRectF pixelacion = elto.pixelacion;
+
+            if ( elto.orden_proces[2] < i && elto.recorte.isEmpty() == false )
+                pixelacion = transform_to_area_recorte( elto, elto.pixelacion );
+
+            frame = pixelar( frame, pixelacion );
+        }
+
+        // Recorte
+        if ( elto.orden_proces[2] == i && elto.recorte.isEmpty() == false )
+        {
+            frame = recortar_video_relativo( frame, elto.recorte );
+            mascara = recortar_video_relativo( mascara, elto.recorte );
+        }
     }
 
-    if ( elto.perspectiva[3] != QPointF() )
-    {
-        frame = perspective_transformation( frame, elto.perspectiva, elto.region_perspectiva );
-        mascara = perspective_transformation( mascara, elto.perspectiva, elto.region_perspectiva );
-    }
-
-    if ( elto.recorte.isEmpty() == false )
-    {
-        frame = recortar_video_relativo( frame, elto.recorte );
-        mascara = recortar_video_relativo( mascara, elto.recorte );
-    }
+    // Aplicamos la rotación actual
+    frame = rotation_transformation( frame, elto.rotacion_actual, QPointF( 0.50, 0.50 ) );
+    mascara = rotation_transformation( mascara, elto.rotacion_actual, QPointF( 0.50, 0.50 ) );
 
     if ( elto.escala_grises )
     {
@@ -621,7 +718,7 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
         frame = filtro_afilado( frame );
     }
 
-    if ( elto.erisionar )
+    if ( elto.erosionar )
     {
         frame = erisionar( frame );
     }
@@ -711,6 +808,8 @@ void MainWindow::window_interact_start_Signal( QPoint point )
 
         if ( punto_actual != 3 )
             return;
+
+        add_rotacion( elto_actual, 0 );
 
         // Guardamos la region de la perspectiva (el area de la imagen que será visible y donde se centrará el resultado del cambio de la perspectiva)
         elto_actual->region_perspectiva = QRectF( 0, 0, 1, 1 );
@@ -838,6 +937,8 @@ void MainWindow::recortar_Btn_Signal()
     if ( rect_abs.isEmpty() || rect_rel.isEmpty() )
         return;
 
+    add_rotacion( elto, 2 );
+
     // Ponemos las coordenadas al elemento
     elto->x = rect_abs.x() + elto->x;
     elto->y = rect_abs.y() + elto->y;
@@ -855,6 +956,14 @@ void MainWindow::eliminar_recorte_Btn_Signal()
     elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
     elto_actual->recorte = QRect();
+
+    // Eliminamos también las otras modificaciones
+    elto_actual->pixelacion = QRect();
+    elto_actual->perspectiva[3] = QPointF();
+    elto_actual->rotaciones.clear();
+
+    elto_actual->rotacion_actual = 0;
+    mem_to_ui();
 
     gestion_interfaz( false );
 }
@@ -897,24 +1006,26 @@ void MainWindow::pixelacion_Btn_Signal()
 {
     elemento_visual *elto = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
-    if ( win_selected == false )
-    {
-        error_msg.showMessage( "Es necesario seleccionar un area para pixelar usando el clic derecho", "selecciona_area" );
-        return;
-    }
-
-    if ( elto->pixelacion.isEmpty() == false )
+    if ( elto->pixelacion.isEmpty() == false ) // Borra la pixelacion guardada
     {
         elto->pixelacion = QRectF();
     }
-    else
+    else // Guarda el QRectF para pixelar
     {
+        if ( win_selected == false )
+        {
+            error_msg.showMessage( "Es necesario seleccionar un area para pixelar usando el clic derecho", "selecciona_area" );
+            return;
+        }
+
         // Obtenemos la selección y la desactivamos
         QRectF rect = win_seleccion_relativa( *elto );
         win_selected = false;
 
         if ( rect.isEmpty() )
             return;
+
+        add_rotacion( elto, 1 );
 
         elto->pixelacion = rect;
     }
@@ -1293,7 +1404,7 @@ void MainWindow::exportar_escena_Btn_Signal()
                  << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
                  << ps[0] << "/" << ps[1] << "/" << ps[2] << "/" << ps[3] << "/" << ps[4] << "/" << ps[5] << "/" << ps[6] << "/" << ps[7] << ";"
                  << p1 << "/" << p2 << "/" << p3 << "/" << p4 << ";"
-                 << elto.rotacion;
+                 << elto.rotacion_actual;
         }
         file.close();
     }
@@ -1369,7 +1480,7 @@ void MainWindow::importar_escena_Btn_Signal()
             subvalues = split_string( values[18], '/' );
             elto.region_perspectiva = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
 
-            elto.rotacion = stoi( values[19] );
+            elto.rotacion_actual = stoi( values[19] );
 
             if ( elto.is_camara )
                 elto.camara = new VideoCapture();
