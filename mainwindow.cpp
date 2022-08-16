@@ -1425,7 +1425,7 @@ void MainWindow::exportar_escena_Btn_Signal()
                  << perspectiva.str() << ";" << region_perspectiva.str() << ";"
                  << elto.rotacion_actual << ";" << rotaciones.str() << ";"
                  << elto.orden_proces[0] << "/" << elto.orden_proces[1] << "/" << elto.orden_proces[2] << ";"
-                 << pixelacion.str() << ";";
+                 << pixelacion.str();
         }
         file.close();
     }
