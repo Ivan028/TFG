@@ -1380,37 +1380,59 @@ void MainWindow::exportar_escena_Btn_Signal()
         {
             elemento_visual elto = lista_eltos_visuales.at( escena_index ).at( i );
 
-            // Obtenemos los valores del rectangulo de recorte y region_perspectiva para exportarlos
+            // Obtenemos los valores de algunas propiedades del elemento visual
+            stringstream recorte, region_perspectiva, pixelacion, perspectiva, rotaciones;
             qreal q1, q2, q3, q4;
+
             elto.recorte.getRect( &q1, &q2, &q3, &q4 );
-            qreal p1, p2, p3, p4;
-            elto.region_perspectiva.getRect( &p1, &p2, &p3, &p4 );
+            recorte << q1 << "/" << q2 << "/" << q3 << "/" << q4 ;
+
+            elto.region_perspectiva.getRect( &q1, &q2, &q3, &q4 );
+            region_perspectiva << q1 << "/" << q2 << "/" << q3 << "/" << q4 ;
+
+            elto.pixelacion.getRect( &q1, &q2, &q3, &q4 );
+            pixelacion << q1 << "/" << q2 << "/" << q3 << "/" << q4 ;
 
             // Obtenemos los valores de los puntos del cambio de perspectiva para exportarlos
             // exportaremos cada punto como (-1, -1) si no hay cambio de perspectiva
-            float ps[8];
             for ( int i = 0; i < 4; i++ )
             {
-                ps[i * 2] = elto.perspectiva[3] == QPointF() ? -1 : elto.perspectiva[i].x();
-                ps[i * 2 + 1] = elto.perspectiva[3] == QPointF() ? -1 : elto.perspectiva[i].y();
+                float x = elto.perspectiva[3] == QPointF() ? -1 : elto.perspectiva[i].x();
+                float y = elto.perspectiva[3] == QPointF() ? -1 : elto.perspectiva[i].y();
+                perspectiva << x << "/" << y;
+
+                if ( i != 3 )
+                    perspectiva << "/";
+            }
+
+            // Exportamos los elementos del vector rotaciones
+            for ( int i = 0; i < ( int )elto.rotaciones.size(); i++ )
+            {
+                rotacion r = elto.rotaciones.at( i );
+                rotaciones << r.centro.x() << "/" << r.centro.y() << "/" << r.cantidad;
+
+                if ( i != ( int )elto.rotaciones.size() - 1 )
+                    rotaciones << "#";
             }
 
             // Escribimos en cada linea un elemento visual
             file << "\n" << elto.x << ";" << elto.y << ";" << elto.width << ";" << elto.height << ";"
-                 << elto.nombre.toStdString() << ";" << elto.is_camara << ";" << elto.id_source << ";" << elto.ocultar << ";"
-                 << elto.detectar_fondo << ";" << elto.tipo_fondo << ";"
+                 << elto.nombre.replace( ";", "" ).toStdString() << ";" << elto.is_camara << ";" << elto.id_source << ";" << elto.ocultar << ";"
+                 << elto.detectar_fondo << ";" << elto.tipo_fondo << ";" << elto.imagen_fondo_ruta.toStdString() << ";"
                  << elto.escala_grises << ";" << elto.R << ";" << elto.G << ";" << elto.B << ";"
-                 << elto.filtro_mediana << ";" << elto.ecualizado << ";"
-                 << q1 << "/" << q2 << "/" << q3 << "/" << q4 << ";"
-                 << ps[0] << "/" << ps[1] << "/" << ps[2] << "/" << ps[3] << "/" << ps[4] << "/" << ps[5] << "/" << ps[6] << "/" << ps[7] << ";"
-                 << p1 << "/" << p2 << "/" << p3 << "/" << p4 << ";"
-                 << elto.rotacion_actual;
+                 << elto.filtro_mediana << ";" << elto.ecualizado << ";" << elto.filtro_afilado << ";" << elto.erosionar << ";"
+                 << recorte.str() << ";"
+                 << perspectiva.str() << ";" << region_perspectiva.str() << ";"
+                 << elto.rotacion_actual << ";" << rotaciones.str() << ";"
+                 << elto.orden_proces[0] << "/" << elto.orden_proces[1] << "/" << elto.orden_proces[2] << ";"
+                 << pixelacion.str() << ";";
         }
         file.close();
     }
     catch ( Exception )
     {
         cerr << "Error al guardar la escena";
+        error_msg.showMessage( "Se ha producido un error al exportar la escena", "exportar" );
     }
 }
 
@@ -1441,6 +1463,9 @@ void MainWindow::importar_escena_Btn_Signal()
             vector<string> values = split_string( str, ';' );
             elemento_visual elto;
 
+            // A partir de aquí empieza la importación de los datos
+            // ----------------------------------------------------
+
             elto.x = stoi( values[0] );
             elto.y = stoi( values[1] );
             elto.width = stoi( values[2] );
@@ -1451,39 +1476,80 @@ void MainWindow::importar_escena_Btn_Signal()
             elto.ocultar = ( values[7] == "1" );
             elto.detectar_fondo = ( values[8] == "1" );
             elto.tipo_fondo = stoi( values[9] );
-            elto.escala_grises = ( values[10] == "1" );
-            elto.R = stoi( values[11] );
-            elto.G = stoi( values[12] );
-            elto.B = stoi( values[13] );
-            elto.filtro_mediana = ( values[14] == "1" );
-            elto.ecualizado = ( values[15] == "1" );
+            elto.imagen_fondo_ruta = QString::fromStdString( values[10] );
+            elto.escala_grises = ( values[11] == "1" );
+            elto.R = stoi( values[12] );
+            elto.G = stoi( values[13] );
+            elto.B = stoi( values[14] );
+            elto.filtro_mediana = ( values[15] == "1" );
+            elto.ecualizado = ( values[16] == "1" );
+            elto.filtro_afilado = ( values[17] == "1" );
+            elto.erosionar = ( values[18] == "1" );
 
             // Reemplazamos los '.' por ',' para que el stod haga correctamente la conversión
             // Obtenemos los 4 valores de recorte (separados por '/')
-            replace( values[16].begin(), values[16].end(), '.', ',' );
-            vector<string> subvalues = split_string( values[16], '/' );
+            replace( values[19].begin(), values[19].end(), '.', ',' );
+            vector<string> subvalues = split_string( values[19], '/' );
             elto.recorte = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
 
             // Obtenemos los valores de perspectiva (separados por '/'), si son validos los guardamos
-            replace( values[17].begin(), values[17].end(), '.', ',' );
-            subvalues = split_string( values[17], '/' );
+            replace( values[20].begin(), values[20].end(), '.', ',' );
+            subvalues = split_string( values[20], '/' );
             if ( subvalues[6] != "-1" )
             {
-                elto.perspectiva[0] = QPointF( stof( subvalues[0] ), stof( subvalues[1] ) );
-                elto.perspectiva[1] = QPointF( stof( subvalues[2] ), stof( subvalues[3] ) );
-                elto.perspectiva[2] = QPointF( stof( subvalues[4] ), stof( subvalues[5] ) );
-                elto.perspectiva[3] = QPointF( stof( subvalues[6] ), stof( subvalues[7] ) );
+                elto.perspectiva[0] = QPointF( stod( subvalues[0] ), stod( subvalues[1] ) );
+                elto.perspectiva[1] = QPointF( stod( subvalues[2] ), stod( subvalues[3] ) );
+                elto.perspectiva[2] = QPointF( stod( subvalues[4] ), stod( subvalues[5] ) );
+                elto.perspectiva[3] = QPointF( stod( subvalues[6] ), stod( subvalues[7] ) );
             }
 
             // Obtenemos los 4 valores de region_perspectiva (separados por '/')
-            replace( values[18].begin(), values[18].end(), '.', ',' );
-            subvalues = split_string( values[18], '/' );
+            replace( values[21].begin(), values[21].end(), '.', ',' );
+            subvalues = split_string( values[21], '/' );
             elto.region_perspectiva = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
 
-            elto.rotacion_actual = stoi( values[19] );
+            elto.rotacion_actual = stoi( values[22] );
 
+            // Obtenemos los valores de rotaciones (cada grupo separados por '#' y los valores por '/')
+            replace( values[23].begin(), values[23].end(), '.', ',' );
+            subvalues = split_string( values[23], '#' );
+            for ( int i = 0; i < ( int )subvalues.size(); i++ )
+            {
+                vector<string> subsubvalues = split_string( subvalues[i], '/' );
+
+                rotacion r;
+                r.centro = QPointF( stod( subsubvalues[0] ), stod( subsubvalues[1] ) );
+                r.cantidad = stoi( subsubvalues[2] );
+                elto.rotaciones.push_back( r );
+            }
+
+            // Obtenemos el orden de procesos (separados por '/')
+            subvalues = split_string( values[24], '/' );
+            elto.orden_proces[0] = stoi( subvalues[0] );
+            elto.orden_proces[1] = stoi( subvalues[1] );
+            elto.orden_proces[2] = stoi( subvalues[2] );
+
+            // Obtenemos los 4 valores de pixelación (separados por '/')
+            replace( values[25].begin(), values[25].end(), '.', ',' );
+            subvalues = split_string( values[25], '/' );
+            elto.pixelacion = QRectF( stod( subvalues[0] ), stod( subvalues[1] ), stod( subvalues[2] ), stod( subvalues[3] ) );
+
+            // --------------------------------------------
+            // Aquí acaba la importación de los datos
+
+            // Hacemos unas últimas configuraciones
             if ( elto.is_camara )
                 elto.camara = new VideoCapture();
+
+            if ( elto.imagen_fondo_ruta != "" )
+            {
+                // Cargamos la imagen
+                Mat aux = cv::imread( elto.imagen_fondo_ruta.toStdString().c_str(), IMREAD_COLOR );
+
+                // Si la imagen se ha podido cargar entonces la guarda
+                if ( aux.data )
+                    cvtColor( aux, elto.imagen_fondo, COLOR_BGR2RGB );
+            }
 
             lista_eltos_visuales.at( lista_eltos_visuales.size() - 1 ).push_back( elto );
         }
@@ -1494,6 +1560,7 @@ void MainWindow::importar_escena_Btn_Signal()
     catch ( Exception )
     {
         cerr << "Error al cargar la escena";
+        error_msg.showMessage( "Se ha producido un error al importar la escena, puede que el resultado sea una escena vacía o con algún elemento faltante", "importar" );
     }
 }
 
