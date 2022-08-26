@@ -1724,7 +1724,7 @@ void MainWindow::compute_Signal()
                 QPointF coords_abs = coords_relativas_elemento( *elto_actual, elto_actual->perspectiva[i], false );
                 // Convertimos las coordenadas del punto (de la imagen de salida) en coordenadas del visor
                 QPoint point = convertir_coords( coords_abs.toPoint(), false );
-                visor->dibujar_circulo( point, 4, Qt::green );
+                visor->dibujar_circulo( point, 4, QColor( 255, 204, 0 ) ); //Color naranja
             }
         }
     }
