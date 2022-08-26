@@ -89,7 +89,7 @@ Mat rotation_transformation( Mat img, int val, QPointF centro )
 
     // Si la imagen se está rotando un ángulo de entre 60º y 120º reducimos la escala para que entre verticalmente
     if ( abs( val % 180 ) >= 60 && abs( val % 180 ) <= 120 )
-        escala = float( img.rows ) / img.cols;
+        escala = float( min( img.rows, img.cols ) ) / max( img.cols, img.rows );
 
     // Calculamos la rotación
     Mat rot_mat = getRotationMatrix2D( centro_abs, val, escala );
