@@ -316,7 +316,7 @@ void MainWindow::gestion_interfaz_seccion_editar()
     }
     else if ( elto_actual->tipo_fondo == 1 )
     {
-        ui->Modo_Fondo_Btn->setText( "Fondo Borroso" );
+        ui->Modo_Fondo_Btn->setText( "Desenfocar Fondo" );
         ui->Imagen_Fondo_Add_Btn->setVisible( false );
     }
     else
@@ -612,7 +612,7 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
     mascara = Mat( Size( frame.cols, frame.rows ), CV_8UC1, Scalar( 255 ) );
 
     /* Si es una cámara con detección de fondo activada entonces:
-     * Si está activado el fondo borroso lo aplicamos al frame
+     * Si está activado el desenfocar fondo lo aplicamos al frame
      * Si lo está el recortar fondo: copiamos la máscara de la red fcn
      * Si es la imagen fondo entonces recortamos usando la mascara y aplicamos una imagen debajo
      */
@@ -623,7 +623,7 @@ void MainWindow::procesar_elemento_visual( elemento_visual elto )
         {
             mascara = mascara_fcn;
         }
-        else if ( elto.tipo_fondo == 1 ) // Fondo Borroso
+        else if ( elto.tipo_fondo == 1 ) // Desenfocar Fondo
         {
             blur( frame, frame, Size( 25, 25 ) );
             elto.last_frame.copyTo( frame, mascara_fcn );
@@ -913,7 +913,7 @@ void MainWindow::modo_fondo_Btn_Signal()
 {
     elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
-    // Intercambiamos el estado del fondo borroso
+    // Intercambiamos el estado del fondo
     elto_actual->tipo_fondo = ( elto_actual->tipo_fondo + 1 ) % 3;
 
     gestion_interfaz( false );
@@ -1580,7 +1580,7 @@ void MainWindow::ocultar_elto_Btn_Signal()
 {
     elemento_visual *elto_actual = &lista_eltos_visuales.at( escena_index ).at( elemento_index );
 
-    // Intercambiamos el estado del fondo borroso
+    // Intercambiamos el estado del fondo
     elto_actual->ocultar = ! elto_actual->ocultar;
 
     gestion_interfaz( true, elemento_index );
