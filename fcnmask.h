@@ -34,6 +34,10 @@ public:
      */
     void stop();
 
+    /* Devuelve el estado de la red neuronal
+     */
+    int get_status();
+
     ~fcnmask();
 
 private:
@@ -46,7 +50,7 @@ private:
     int height;
     int width;
 
-    bool run;
+    int status; //[-1] -> Error, [0] -> No procesando, [1] -> Procesando
 };
 
 #endif // FCNMASK_H

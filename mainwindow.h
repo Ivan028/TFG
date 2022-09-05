@@ -189,7 +189,8 @@ private:
     void gestion_interfaz( bool update_lista_eltos, int seleccionar );
 
     // Inicia/detiene (dependiendo de val) el procesamiento de la red fcn en el elemento y escena determinados
-    void switch_FCN_NET( bool val, int escena, int elemento );
+    // Devolverá -1 si al iniciar la red ha ocurrido un error, 0 en el resto de casos
+    int switch_FCN_NET( bool val, int escena, int elemento );
 
     // Borra el elemento especificado de "lista_eltos_visuales"
     void borrar_elto( int escena, int elemento );

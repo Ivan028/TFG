@@ -541,7 +541,7 @@ int MainWindow::establecer_resolucion( int index_res )
 
 /* ---      Elementos     --- */
 
-void MainWindow::switch_FCN_NET( bool val, int escena, int elemento )
+int MainWindow::switch_FCN_NET( bool val, int escena, int elemento )
 {
     elemento_visual *elto_actual = &lista_eltos_visuales.at( escena ).at( elemento );
 
@@ -556,11 +556,16 @@ void MainWindow::switch_FCN_NET( bool val, int escena, int elemento )
             int width = cam->get( CAP_PROP_FRAME_WIDTH );
 
             fcnmask *fcnd = new fcnmask( width, height );
+
+            // Si hay un error con la FCN devolvemos -1
+            if ( fcnd->get_status() == -1 )
+                return -1;
+
             elto_actual->fcn = fcnd;
         }
         elto_actual->thread = new std::thread( &fcnmask::apply_network_FCN, elto_actual->fcn );
     }
-    else
+    else if ( elto_actual->fcn != nullptr )
     {
         // Detiene el procesamiento de la red
         elto_actual->fcn->stop();
@@ -568,6 +573,7 @@ void MainWindow::switch_FCN_NET( bool val, int escena, int elemento )
         delete elto_actual->thread;
         elto_actual->thread = nullptr;
     }
+    return 0;
 }
 
 void MainWindow::borrar_elto( int escena, int elemento )
@@ -896,7 +902,11 @@ void MainWindow::window_interact_update_Signal( QPoint point )
 
 void MainWindow::detect_fondo_Btn_Signal( bool val )
 {
-    switch_FCN_NET( val, escena_index, elemento_index );
+    if ( switch_FCN_NET( val, escena_index, elemento_index ) == -1 )
+    {
+        ui->Detectar_Fondo_Btn->setChecked( false );
+        error_msg.showMessage( "Falta el archivo 'fcn.caffemodel' dentro de la carpeta 'netData'. Asegurate de tener 'git lfs' antes de hacer 'git clone' o accede a la web del repositorio 'https://github.com/Ivan028/TFG' para descargar el archivo", "fcn_falta_archivo" );
+    }
 }
 
 void MainWindow::modo_color_Btn_Signal()

@@ -3,9 +3,18 @@
 fcnmask::fcnmask( int width, int height )
 {
     // Configuración de la red neuronal
-    network = dnn::readNetFromCaffe( "../TFG/netData/fcn.prototxt", "../TFG/netData/fcn.caffemodel" );
-    network.setPreferableTarget( dnn::DNN_TARGET_CUDA );
-    network.setPreferableBackend( dnn::DNN_BACKEND_CUDA );
+    try
+    {
+        network = dnn::readNetFromCaffe( "../TFG/netData/fcn.prototxt", "../TFG/netData/fcn.caffemodel" );
+        network.setPreferableTarget( dnn::DNN_TARGET_CUDA );
+        network.setPreferableBackend( dnn::DNN_BACKEND_CUDA );
+
+        status = 0;
+    }
+    catch ( Exception )
+    {
+        status = -1;
+    }
 
     result_mask = Mat( Size( width, height ), CV_8UC1, Scalar( 0 ) );
     result_img = Mat( Size( width, height ), CV_8UC3, Scalar( 0, 0, 0 ) );
@@ -24,7 +33,12 @@ fcnmask::~fcnmask()
 
 void fcnmask::stop()
 {
-    run = false;
+    status = 0;
+}
+
+int fcnmask::get_status()
+{
+    return status;
 }
 
 void fcnmask::apply_network_FCN()
@@ -41,8 +55,8 @@ void fcnmask::apply_network_FCN()
 
     resultados.create( height_reduced, width_reduced, CV_8UC1 );
 
-    run = true;
-    while ( run )
+    status = 1;
+    while ( status == 1 )
     {
         img = original_img.clone();
 
